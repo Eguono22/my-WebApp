@@ -1,0 +1,16 @@
+{
+  "name": "health-assessment-webapp",
+  "version": "1.0.0",
+  "description": "Intelligent computer systems application to assess human health",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["health", "assessment", "AI", "web-app"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
