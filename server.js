@@ -70,7 +70,7 @@ class HealthAssessmentAI {
 
   scoreSleep(hoursPerNight) {
     if (hoursPerNight >= 7 && hoursPerNight <= 9) return 100;
-    if (hoursPerNight >= 6 || hoursPerNight <= 10) return 80;
+    if ((hoursPerNight >= 6 && hoursPerNight < 7) || (hoursPerNight > 9 && hoursPerNight <= 10)) return 80;
     return 50;
   }
 
@@ -151,14 +151,40 @@ app.post('/api/assess', (req, res) => {
   try {
     const healthData = req.body;
     
-    // Validate required fields
-    const requiredFields = ['age', 'weight', 'height', 'systolic', 'diastolic', 
-                           'heartRate', 'exerciseHours', 'sleepHours', 'stressLevel'];
+    // Validate required fields and types
+    const validationRules = {
+      age: { min: 1, max: 120, type: 'number' },
+      weight: { min: 20, max: 300, type: 'number' },
+      height: { min: 100, max: 250, type: 'number' },
+      systolic: { min: 70, max: 200, type: 'number' },
+      diastolic: { min: 40, max: 130, type: 'number' },
+      heartRate: { min: 40, max: 200, type: 'number' },
+      exerciseHours: { min: 0, max: 40, type: 'number' },
+      sleepHours: { min: 0, max: 24, type: 'number' },
+      stressLevel: { min: 1, max: 5, type: 'number' }
+    };
     
-    for (const field of requiredFields) {
-      if (healthData[field] === undefined || healthData[field] === null) {
+    for (const [field, rules] of Object.entries(validationRules)) {
+      const value = healthData[field];
+      
+      // Check if field exists
+      if (value === undefined || value === null) {
         return res.status(400).json({ 
           error: `Missing required field: ${field}` 
+        });
+      }
+      
+      // Check if field is a number
+      if (typeof value !== 'number' || isNaN(value)) {
+        return res.status(400).json({ 
+          error: `Field ${field} must be a valid number` 
+        });
+      }
+      
+      // Check if value is within acceptable range
+      if (value < rules.min || value > rules.max) {
+        return res.status(400).json({ 
+          error: `Field ${field} must be between ${rules.min} and ${rules.max}` 
         });
       }
     }

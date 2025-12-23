@@ -82,11 +82,22 @@ function displayResults(result) {
     const detailedScoresContainer = document.getElementById('detailedScores');
     detailedScoresContainer.innerHTML = '';
     
+    // Metric name mapping for better readability
+    const metricLabels = {
+        age: 'Age',
+        bmi: 'BMI',
+        bloodPressure: 'Blood Pressure',
+        heartRate: 'Heart Rate',
+        exercise: 'Exercise',
+        sleep: 'Sleep',
+        stress: 'Stress'
+    };
+    
     for (const [metric, score] of Object.entries(result.detailedScores)) {
         const scoreItem = document.createElement('div');
         scoreItem.className = 'score-item';
         
-        const metricName = metric.replace(/([A-Z])/g, ' $1').trim();
+        const metricName = metricLabels[metric] || metric;
         
         scoreItem.innerHTML = `
             <span class="score-item-name">${metricName}</span>
