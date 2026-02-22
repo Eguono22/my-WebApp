@@ -3,114 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Health Assessment System</title>
+    <title>AI Health Assessment System</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- AI Chat Button -->
+    <button id="aiChatBtn" class="ai-chat-toggle" title="Chat with AI Health Assistant">
+        <i class="fas fa-robot"></i>
+    </button>
+
+    <!-- AI Chat Panel -->
+    <div id="aiChatPanel" class="ai-chat-panel">
+        <div class="chat-header">
+            <div class="chat-header-content">
+                <i class="fas fa-robot"></i>
+                <div>
+                    <h3>AI Health Assistant</h3>
+                    <span class="status-indicator">Online</span>
+                </div>
+            </div>
+            <button id="closeChatBtn" class="close-chat-btn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="chatMessages" class="chat-messages">
+            <div class="message bot-message">
+                <div class="message-content">
+                    <p>👋 Hello! I'm your AI Health Assistant. I can help you understand your health assessment results, answer health-related questions, and provide personalized wellness advice.</p>
+                    <p class="message-time">Just now</p>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <input type="text" id="chatInput" placeholder="Ask me anything about your health..." autocomplete="off">
+            <button id="sendChatBtn">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
     <div class="container">
         <header>
-            <h1>🏥 AI Health Assessment System</h1>
-            <p class="subtitle">Intelligent computer systems to assess your health</p>
+            <div class="header-content">
+                <i class="fas fa-heartbeat header-icon"></i>
+                <h1>AI Health Assessment System</h1>
+                <p class="subtitle">Advanced AI-powered health analysis and personalized recommendations</p>
+            </div>
         </header>
 
         <div class="main-content">
             <div class="form-section">
-                <h2>Enter Your Health Information</h2>
+                <div class="section-header">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h2>Enter Your Health Information</h2>
+                </div>
                 <form id="healthForm">
-                    <div class="form-group">
-                        <label for="age">Age (years)</label>
-                        <input type="number" id="age" name="age" min="1" max="120" required>
-                    </div>
-
-                    <div class="form-row">
+                    <div class="form-grid">
                         <div class="form-group">
-                            <label for="weight">Weight (kg)</label>
+                            <label for="age">
+                                <i class="fas fa-calendar"></i>
+                                Age (years)
+                            </label>
+                            <input type="number" id="age" name="age" min="1" max="120" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="weight">
+                                <i class="fas fa-weight"></i>
+                                Weight (kg)
+                            </label>
                             <input type="number" id="weight" name="weight" min="20" max="300" step="0.1" required>
                         </div>
+
                         <div class="form-group">
-                            <label for="height">Height (cm)</label>
+                            <label for="height">
+                                <i class="fas fa-ruler-vertical"></i>
+                                Height (cm)
+                            </label>
                             <input type="number" id="height" name="height" min="100" max="250" required>
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <h3>Blood Pressure</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="systolic">Systolic (mmHg)</label>
-                                <input type="number" id="systolic" name="systolic" min="70" max="200" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="diastolic">Diastolic (mmHg)</label>
-                                <input type="number" id="diastolic" name="diastolic" min="40" max="130" required>
-                            </div>
+                        <div class="form-group">
+                            <label for="heartRate">
+                                <i class="fas fa-heartbeat"></i>
+                                Resting Heart Rate (bpm)
+                            </label>
+                            <input type="number" id="heartRate" name="heartRate" min="40" max="200" required>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="heartRate">Resting Heart Rate (bpm)</label>
-                        <input type="number" id="heartRate" name="heartRate" min="40" max="200" required>
+                    <div class="form-section-divider">
+                        <span>Blood Pressure</span>
                     </div>
 
-                    <div class="form-group">
-                        <label for="exerciseHours">Exercise (hours per week)</label>
-                        <input type="number" id="exerciseHours" name="exerciseHours" min="0" max="40" step="0.5" required>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="systolic">
+                                <i class="fas fa-tachometer-alt"></i>
+                                Systolic (mmHg)
+                            </label>
+                            <input type="number" id="systolic" name="systolic" min="70" max="200" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="diastolic">
+                                <i class="fas fa-tachometer-alt"></i>
+                                Diastolic (mmHg)
+                            </label>
+                            <input type="number" id="diastolic" name="diastolic" min="40" max="130" required>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="sleepHours">Sleep (hours per night)</label>
-                        <input type="number" id="sleepHours" name="sleepHours" min="0" max="24" step="0.5" required>
+                    <div class="form-section-divider">
+                        <span>Lifestyle Metrics</span>
                     </div>
 
-                    <div class="form-group">
-                        <label for="stressLevel">Stress Level</label>
-                        <select id="stressLevel" name="stressLevel" required>
-                            <option value="">Select stress level</option>
-                            <option value="1">Very Low</option>
-                            <option value="2">Low</option>
-                            <option value="3">Moderate</option>
-                            <option value="4">High</option>
-                            <option value="5">Very High</option>
-                        </select>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="exerciseHours">
+                                <i class="fas fa-running"></i>
+                                Exercise (hours/week)
+                            </label>
+                            <input type="number" id="exerciseHours" name="exerciseHours" min="0" max="40" step="0.5" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sleepHours">
+                                <i class="fas fa-bed"></i>
+                                Sleep (hours/night)
+                            </label>
+                            <input type="number" id="sleepHours" name="sleepHours" min="0" max="24" step="0.5" required>
+                        </div>
+
+                        <div class="form-group span-2">
+                            <label for="stressLevel">
+                                <i class="fas fa-brain"></i>
+                                Stress Level
+                            </label>
+                            <select id="stressLevel" name="stressLevel" required>
+                                <option value="">Select stress level</option>
+                                <option value="1">😊 Very Low - Feeling relaxed and calm</option>
+                                <option value="2">🙂 Low - Minimal stress</option>
+                                <option value="3">😐 Moderate - Manageable stress</option>
+                                <option value="4">😟 High - Feeling stressed</option>
+                                <option value="5">😰 Very High - Overwhelming stress</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <button type="submit" class="btn-submit">🔍 Assess My Health</button>
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-chart-line"></i>
+                        Analyze My Health
+                    </button>
                 </form>
             </div>
 
             <div id="resultsSection" class="results-section" style="display: none;">
-                <h2>📊 Your Health Assessment Results</h2>
+                <div class="section-header">
+                    <i class="fas fa-chart-bar"></i>
+                    <h2>Your Health Assessment Results</h2>
+                </div>
                 
-                <div class="score-card">
-                    <div class="overall-score">
-                        <h3>Overall Health Score</h3>
-                        <div class="score-display" id="overallScore">--</div>
-                        <div class="score-status" id="healthStatus">--</div>
+                <div class="results-grid">
+                    <div class="score-card">
+                        <div class="overall-score">
+                            <div class="score-icon">
+                                <i class="fas fa-heart-pulse"></i>
+                            </div>
+                            <h3>Overall Health Score</h3>
+                            <div class="score-display" id="overallScore">--</div>
+                            <div class="score-status" id="healthStatus">--</div>
+                            <div class="score-progress">
+                                <div class="score-progress-bar" id="scoreProgressBar"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bmi-card">
+                        <div class="card-icon">
+                            <i class="fas fa-weight-scale"></i>
+                        </div>
+                        <h3>Body Mass Index</h3>
+                        <div class="bmi-value" id="bmiValue">--</div>
+                        <div class="bmi-category" id="bmiCategory">--</div>
                     </div>
                 </div>
 
-                <div class="bmi-card">
-                    <h3>Body Mass Index (BMI)</h3>
-                    <div class="bmi-value" id="bmiValue">--</div>
-                </div>
-
                 <div class="detailed-scores">
-                    <h3>Detailed Metric Scores</h3>
+                    <h3>
+                        <i class="fas fa-chart-line"></i>
+                        Detailed Metric Analysis
+                    </h3>
                     <div id="detailedScores"></div>
                 </div>
 
                 <div class="recommendations">
-                    <h3>🎯 AI-Generated Recommendations</h3>
+                    <h3>
+                        <i class="fas fa-lightbulb"></i>
+                        AI-Generated Recommendations
+                    </h3>
                     <ul id="recommendationsList"></ul>
+                    <button id="askAiBtn" class="btn-ask-ai">
+                        <i class="fas fa-robot"></i>
+                        Ask AI More Questions
+                    </button>
                 </div>
 
-                <button onclick="resetForm()" class="btn-reset">📝 New Assessment</button>
+                <div class="action-buttons">
+                    <button onclick="resetForm()" class="btn-reset">
+                        <i class="fas fa-redo"></i>
+                        New Assessment
+                    </button>
+                    <button id="shareResultsBtn" class="btn-share">
+                        <i class="fas fa-share-nodes"></i>
+                        Share Results
+                    </button>
+                </div>
             </div>
         </div>
 
         <footer>
-            <p>⚠️ Disclaimer: This is an AI-based assessment tool for informational purposes only. 
-               Always consult with healthcare professionals for medical advice.</p>
+            <div class="footer-content">
+                <p>
+                    <i class="fas fa-shield-heart"></i>
+                    <strong>Medical Disclaimer:</strong> This is an AI-based assessment tool for informational and educational purposes only. 
+                    Always consult with qualified healthcare professionals for medical advice, diagnosis, or treatment.
+                </p>
+                <p class="footer-info">
+                    <i class="fas fa-lock"></i> Your health data is processed securely and never stored.
+                </p>
+            </div>
         </footer>
     </div>
 
