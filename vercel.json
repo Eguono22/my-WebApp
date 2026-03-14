@@ -12,6 +12,14 @@
   ],
   "routes": [
     {
+      "src": "/(.*)",
+      "headers": {
+        "host": "www.healthassessmenthub.com"
+      },
+      "status": 301,
+      "dest": "https://healthassessmenthub.com/$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "server.js"
     },
