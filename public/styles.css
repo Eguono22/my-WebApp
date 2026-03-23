@@ -249,7 +249,8 @@ header h1 {
 .btn-submit,
 .btn-reset,
 .btn-share,
-.btn-ask-ai {
+.btn-ask-ai,
+.btn-cta-primary {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -273,7 +274,8 @@ header h1 {
 .btn-submit::before,
 .btn-reset::before,
 .btn-share::before,
-.btn-ask-ai::before {
+.btn-ask-ai::before,
+.btn-cta-primary::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -289,7 +291,8 @@ header h1 {
 .btn-submit:hover::before,
 .btn-reset:hover::before,
 .btn-share:hover::before,
-.btn-ask-ai:hover::before {
+.btn-ask-ai:hover::before,
+.btn-cta-primary:hover::before {
     width: 300px;
     height: 300px;
 }
@@ -297,7 +300,8 @@ header h1 {
 .btn-submit:hover,
 .btn-reset:hover,
 .btn-share:hover,
-.btn-ask-ai:hover {
+.btn-ask-ai:hover,
+.btn-cta-primary:hover {
     transform: translateY(-3px);
     box-shadow: var(--shadow-lg);
 }
@@ -305,7 +309,8 @@ header h1 {
 .btn-submit:active,
 .btn-reset:active,
 .btn-share:active,
-.btn-ask-ai:active {
+.btn-ask-ai:active,
+.btn-cta-primary:active {
     transform: translateY(-1px);
 }
 
@@ -329,6 +334,11 @@ header h1 {
 .btn-ask-ai {
     background: linear-gradient(135deg, #2dd4bf 0%, #3b82f6 100%);
     margin-top: 20px;
+}
+
+.btn-cta-primary {
+    background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+    margin-top: 18px;
 }
 
 /* Results Section */
@@ -590,6 +600,230 @@ header h1 {
 
 .recommendations h3 i {
     color: #f59e0b;
+}
+
+.post-assessment-cta {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    padding: 30px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    border-left: 5px solid #f97316;
+    box-shadow: var(--shadow-md);
+}
+
+.post-assessment-cta h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #9a3412;
+    margin-bottom: 14px;
+    font-size: 1.35em;
+}
+
+.post-assessment-cta h3 i {
+    color: #f97316;
+}
+
+.post-assessment-cta p {
+    color: #7c2d12;
+    font-size: 1.05em;
+    line-height: 1.7;
+}
+
+/* History Section */
+.history-section {
+    margin-top: 40px;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.history-chart-card,
+.history-list-card,
+.history-goal-card,
+.history-sync-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    padding: 30px;
+    margin-bottom: 20px;
+}
+
+.history-chart-card h3,
+.history-list-card h3,
+.history-goal-card h3,
+.history-sync-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    font-size: 1.25em;
+}
+
+.history-chart-card h3 i,
+.history-list-card h3 i,
+.history-goal-card h3 i,
+.history-sync-card h3 i {
+    color: #667eea;
+}
+
+.goal-controls {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.goal-controls label {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+#scoreGoalInput {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.95em;
+}
+
+#scoreGoalInput:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+#saveGoalBtn {
+    width: auto;
+    margin: 0;
+    padding: 11px 16px;
+    font-size: 0.95em;
+}
+
+.goal-progress-wrap {
+    margin-top: 16px;
+}
+
+.goal-progress {
+    height: 12px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.goal-progress-bar {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #22c55e 0%, #3b82f6 100%);
+    transition: width 0.4s ease;
+}
+
+#goalProgressText {
+    margin-top: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.sync-help {
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+}
+
+.sync-controls {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 12px;
+}
+
+#syncProfileId {
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.95em;
+}
+
+#syncProfileId:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+#syncSaveBtn,
+#syncLoadBtn {
+    margin: 0;
+    padding: 12px 16px;
+    font-size: 0.95em;
+}
+
+.history-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.history-controls label {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+#historyMetricSelect {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95em;
+    color: var(--text-primary);
+    background: white;
+}
+
+#historyMetricSelect:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+#historyTrendChart {
+    width: 100%;
+    min-height: 280px;
+}
+
+#historyList {
+    display: grid;
+    gap: 12px;
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-light);
+}
+
+.history-item-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+}
+
+.history-item-main strong {
+    font-size: 1.2em;
+}
+
+.history-item-main span {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.history-item-meta {
+    display: flex;
+    gap: 14px;
+    color: var(--text-secondary);
+    font-size: 0.9em;
 }
 
 #recommendationsList {
@@ -980,6 +1214,37 @@ footer {
         width: 55px;
         height: 55px;
         font-size: 1.5em;
+    }
+
+    .history-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .history-item-meta {
+        flex-wrap: wrap;
+        gap: 8px 12px;
+    }
+
+    .history-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #historyMetricSelect {
+        width: 100%;
+    }
+
+    .goal-controls {
+        grid-template-columns: 1fr;
+    }
+
+    #saveGoalBtn {
+        width: 100%;
+    }
+
+    .sync-controls {
+        grid-template-columns: 1fr;
     }
 }
 

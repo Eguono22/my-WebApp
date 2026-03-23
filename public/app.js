@@ -1,6 +1,78 @@
 // Enhanced Health Assessment App with AI Chat Integration
 
 let currentAssessmentData = null;
+const HISTORY_STORAGE_KEY = 'healthAssessmentHistoryV1';
+const SCORE_GOAL_STORAGE_KEY = 'healthAssessmentScoreGoalV1';
+const SYNC_PROFILE_STORAGE_KEY = 'healthAssessmentSyncProfileV1';
+let trendChart = null;
+let selectedHistoryMetric = 'overallScore';
+
+const HISTORY_METRICS = {
+    overallScore: {
+        label: 'Overall Score',
+        chartTitle: 'Overall Health Score Trend',
+        color: '#667eea',
+        min: 0,
+        max: 100,
+        stepSize: 20
+    },
+    bmi: {
+        label: 'BMI',
+        chartTitle: 'BMI Trend',
+        color: '#f97316',
+        min: 10,
+        max: 45,
+        stepSize: 5
+    },
+    sleepHours: {
+        label: 'Sleep (hours/night)',
+        chartTitle: 'Sleep Trend',
+        color: '#06b6d4',
+        min: 0,
+        max: 12,
+        stepSize: 2
+    },
+    exerciseHours: {
+        label: 'Exercise (hours/week)',
+        chartTitle: 'Exercise Trend',
+        color: '#22c55e',
+        min: 0,
+        max: 12,
+        stepSize: 2
+    },
+    stressLevel: {
+        label: 'Stress Level',
+        chartTitle: 'Stress Trend',
+        color: '#ef4444',
+        min: 1,
+        max: 5,
+        stepSize: 1
+    },
+    heartRate: {
+        label: 'Heart Rate (bpm)',
+        chartTitle: 'Heart Rate Trend',
+        color: '#ec4899',
+        min: 40,
+        max: 120,
+        stepSize: 10
+    },
+    systolic: {
+        label: 'Systolic BP (mmHg)',
+        chartTitle: 'Systolic Blood Pressure Trend',
+        color: '#8b5cf6',
+        min: 70,
+        max: 180,
+        stepSize: 10
+    },
+    diastolic: {
+        label: 'Diastolic BP (mmHg)',
+        chartTitle: 'Diastolic Blood Pressure Trend',
+        color: '#a855f7',
+        min: 40,
+        max: 120,
+        stepSize: 10
+    }
+};
 
 // Health Form Submission
 document.getElementById('healthForm').addEventListener('submit', async (e) => {
@@ -41,9 +113,11 @@ document.getElementById('healthForm').addEventListener('submit', async (e) => {
 
         const result = await response.json();
         currentAssessmentData = { ...formData, ...result };
+        saveAssessmentToHistory(currentAssessmentData);
         
         // Display results
         displayResults(result);
+        renderHistorySection();
         
         // Hide form and show results with animation
         document.querySelector('.form-section').style.display = 'none';
@@ -174,6 +248,46 @@ function displayResults(result) {
             li.style.transform = 'translateY(0)';
         }, 100 * (index + 1));
     });
+
+    updatePostAssessmentCta(result);
+}
+
+function updatePostAssessmentCta(result) {
+    const ctaTitle = document.getElementById('ctaTitle');
+    const ctaMessage = document.getElementById('ctaMessage');
+    const ctaPrimaryBtn = document.getElementById('ctaPrimaryBtn');
+
+    let titleText = 'Next Step';
+    let messageText = 'Get a personalized action plan based on your assessment.';
+    let buttonText = 'Build My Action Plan';
+    let aiPrompt = 'Create a practical weekly health action plan from my assessment results.';
+
+    if (result.overallScore >= 85) {
+        titleText = 'Keep Your Momentum';
+        messageText = 'You are doing great. Build a maintenance plan to protect these results.';
+        buttonText = 'Create Maintenance Plan';
+        aiPrompt = 'I scored in the excellent range. Create a 7-day maintenance plan to keep my health score high.';
+    } else if (result.overallScore >= 70) {
+        titleText = 'Move From Good To Excellent';
+        messageText = 'A focused weekly plan can help improve your lowest-scoring areas.';
+        buttonText = 'Build Improvement Plan';
+        aiPrompt = 'I scored in the good range. Create a 7-day plan to move from good to excellent health.';
+    } else if (result.overallScore >= 50) {
+        titleText = 'Start Your Recovery Plan';
+        messageText = 'Take small daily actions to improve your sleep, activity, and stress levels.';
+        buttonText = 'Start 7-Day Plan';
+        aiPrompt = 'I scored in the fair range. Give me a simple 7-day recovery plan with daily goals.';
+    } else {
+        titleText = 'Act Now';
+        messageText = 'Prioritize professional support and a clear daily routine for immediate improvement.';
+        buttonText = 'Get Priority Plan';
+        aiPrompt = 'I scored in needs improvement. Give me a gentle but urgent 7-day plan and tell me what to discuss with a healthcare professional.';
+    }
+
+    ctaTitle.innerHTML = `<i class="fas fa-bullseye"></i>${titleText}`;
+    ctaMessage.textContent = messageText;
+    ctaPrimaryBtn.innerHTML = `<i class="fas fa-route"></i>${buttonText}`;
+    ctaPrimaryBtn.dataset.aiPrompt = aiPrompt;
 }
 
 function animateValue(element, start, end, duration) {
@@ -212,6 +326,7 @@ const chatInput = document.getElementById('chatInput');
 const sendChatBtn = document.getElementById('sendChatBtn');
 const chatMessages = document.getElementById('chatMessages');
 const askAiBtn = document.getElementById('askAiBtn');
+const ctaPrimaryBtn = document.getElementById('ctaPrimaryBtn');
 
 // Toggle chat panel
 aiChatBtn.addEventListener('click', () => {
@@ -239,6 +354,208 @@ if (askAiBtn) {
                 chatInput.value = contextMessage;
             }, 300);
         }
+    });
+}
+
+function saveAssessmentToHistory(assessmentData) {
+    try {
+        const history = getAssessmentHistory();
+        const entry = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            createdAt: new Date().toISOString(),
+            overallScore: assessmentData.overallScore,
+            status: assessmentData.status,
+            bmi: assessmentData.bmi,
+            age: assessmentData.age,
+            systolic: assessmentData.systolic,
+            diastolic: assessmentData.diastolic,
+            heartRate: assessmentData.heartRate,
+            exerciseHours: assessmentData.exerciseHours,
+            sleepHours: assessmentData.sleepHours,
+            stressLevel: assessmentData.stressLevel
+        };
+
+        history.push(entry);
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+    } catch (error) {
+        console.error('Failed to save assessment history:', error);
+    }
+}
+
+function getAssessmentHistory() {
+    try {
+        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.error('Failed to read assessment history:', error);
+        return [];
+    }
+}
+
+function getSavedScoreGoal() {
+    const stored = localStorage.getItem(SCORE_GOAL_STORAGE_KEY);
+    const parsed = parseInt(stored || '85', 10);
+    if (Number.isNaN(parsed)) return 85;
+    return Math.min(100, Math.max(1, parsed));
+}
+
+function saveScoreGoal(goalValue) {
+    localStorage.setItem(SCORE_GOAL_STORAGE_KEY, String(goalValue));
+}
+
+function formatHistoryDate(isoDate) {
+    const date = new Date(isoDate);
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function renderHistorySection() {
+    const historySection = document.getElementById('historySection');
+    const historyList = document.getElementById('historyList');
+    const history = getAssessmentHistory();
+    const scoreGoalInput = document.getElementById('scoreGoalInput');
+    const scoreGoal = getSavedScoreGoal();
+
+    if (scoreGoalInput && scoreGoalInput.value !== String(scoreGoal)) {
+        scoreGoalInput.value = String(scoreGoal);
+    }
+
+    if (!history.length) {
+        historySection.style.display = 'none';
+        return;
+    }
+
+    historySection.style.display = 'block';
+    historyList.innerHTML = '';
+
+    const sortedHistory = [...history].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const recent = sortedHistory.slice(0, 8);
+
+    recent.forEach((entry) => {
+        const card = document.createElement('div');
+        card.className = 'history-item';
+        card.innerHTML = `
+            <div class="history-item-main">
+                <strong>${entry.overallScore}/100</strong>
+                <span>${entry.status}</span>
+            </div>
+            <div class="history-item-meta">
+                <span>BMI ${entry.bmi}</span>
+                <span>${entry.systolic}/${entry.diastolic} mmHg</span>
+                <span>${formatHistoryDate(entry.createdAt)}</span>
+            </div>
+        `;
+        historyList.appendChild(card);
+    });
+
+    const chronologicalHistory = [...history].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    renderTrendChart(chronologicalHistory);
+    updateGoalProgress(chronologicalHistory, scoreGoal);
+}
+
+function updateGoalProgress(history, scoreGoal) {
+    const progressBar = document.getElementById('goalProgressBar');
+    const progressText = document.getElementById('goalProgressText');
+
+    if (!progressBar || !progressText) return;
+    if (!history.length) {
+        progressBar.style.width = '0%';
+        progressText.textContent = 'Set a target score to track your progress.';
+        return;
+    }
+
+    const latest = history[history.length - 1];
+    const latestScore = latest.overallScore;
+    const percentage = Math.min(100, Math.round((latestScore / scoreGoal) * 100));
+    const gap = scoreGoal - latestScore;
+
+    progressBar.style.width = `${percentage}%`;
+
+    if (gap <= 0) {
+        progressText.textContent = `Goal reached. Latest score ${latestScore} is at or above your target ${scoreGoal}.`;
+        progressBar.style.background = 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+    } else {
+        progressText.textContent = `${gap} points to go. Latest score: ${latestScore}, target: ${scoreGoal}.`;
+        progressBar.style.background = 'linear-gradient(90deg, #22c55e 0%, #3b82f6 100%)';
+    }
+}
+
+function renderTrendChart(history) {
+    const canvas = document.getElementById('historyTrendChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const metricConfig = HISTORY_METRICS[selectedHistoryMetric] || HISTORY_METRICS.overallScore;
+
+    const labels = history.map((entry) => {
+        const date = new Date(entry.createdAt);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    const metricData = history.map((entry) => {
+        const value = entry[selectedHistoryMetric];
+        return typeof value === 'number' ? value : null;
+    });
+
+    const trendTitle = document.querySelector('.history-chart-card h3');
+    if (trendTitle) {
+        trendTitle.innerHTML = `<i class="fas fa-chart-line"></i>${metricConfig.chartTitle}`;
+    }
+
+    if (trendChart) {
+        trendChart.destroy();
+    }
+
+    trendChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: metricConfig.label,
+                    data: metricData,
+                    borderColor: metricConfig.color,
+                    backgroundColor: `${metricConfig.color}33`,
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    min: metricConfig.min,
+                    max: metricConfig.max,
+                    ticks: { stepSize: metricConfig.stepSize }
+                }
+            }
+        }
+    });
+}
+
+if (ctaPrimaryBtn) {
+    ctaPrimaryBtn.addEventListener('click', () => {
+        aiChatPanel.classList.add('active');
+        aiChatBtn.style.display = 'none';
+        chatInput.focus();
+
+        const prompt = ctaPrimaryBtn.dataset.aiPrompt || 'Create a practical health action plan from my assessment results.';
+        setTimeout(() => {
+            chatInput.value = prompt;
+        }, 300);
     });
 }
 
@@ -424,9 +741,138 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+function sanitizeProfileId(rawId) {
+    return (rawId || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+}
+
 // Welcome message on page load
 window.addEventListener('load', () => {
+    const scoreGoalInput = document.getElementById('scoreGoalInput');
+    if (scoreGoalInput) {
+        scoreGoalInput.value = String(getSavedScoreGoal());
+    }
+
+    const syncProfileIdInput = document.getElementById('syncProfileId');
+    if (syncProfileIdInput) {
+        syncProfileIdInput.value = localStorage.getItem(SYNC_PROFILE_STORAGE_KEY) || '';
+    }
+
+    renderHistorySection();
     setTimeout(() => {
         showNotification('Welcome! Start your health assessment or chat with our AI assistant.', 'info');
     }, 1000);
 });
+
+const historyMetricSelect = document.getElementById('historyMetricSelect');
+if (historyMetricSelect) {
+    historyMetricSelect.addEventListener('change', (e) => {
+        selectedHistoryMetric = e.target.value;
+        renderHistorySection();
+    });
+}
+
+const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', () => {
+        localStorage.removeItem(HISTORY_STORAGE_KEY);
+        if (trendChart) {
+            trendChart.destroy();
+            trendChart = null;
+        }
+        renderHistorySection();
+        showNotification('Assessment history cleared.', 'success');
+    });
+}
+
+const saveGoalBtn = document.getElementById('saveGoalBtn');
+if (saveGoalBtn) {
+    saveGoalBtn.addEventListener('click', () => {
+        const scoreGoalInput = document.getElementById('scoreGoalInput');
+        if (!scoreGoalInput) return;
+
+        const goal = parseInt(scoreGoalInput.value, 10);
+        if (Number.isNaN(goal) || goal < 1 || goal > 100) {
+            showNotification('Target score must be between 1 and 100.', 'error');
+            return;
+        }
+
+        saveScoreGoal(goal);
+        renderHistorySection();
+        showNotification('Goal saved.', 'success');
+    });
+}
+
+const syncSaveBtn = document.getElementById('syncSaveBtn');
+if (syncSaveBtn) {
+    syncSaveBtn.addEventListener('click', async () => {
+        const syncProfileIdInput = document.getElementById('syncProfileId');
+        if (!syncProfileIdInput) return;
+
+        const profileId = sanitizeProfileId(syncProfileIdInput.value);
+        if (!profileId) {
+            showNotification('Enter a valid Profile ID first.', 'error');
+            return;
+        }
+
+        syncProfileIdInput.value = profileId;
+        localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, profileId);
+
+        try {
+            const response = await fetch('/api/history/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId,
+                    history: getAssessmentHistory(),
+                    goalTarget: getSavedScoreGoal()
+                })
+            });
+
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.error || 'Sync save failed');
+            }
+
+            showNotification('Cloud sync saved successfully.', 'success');
+        } catch (error) {
+            console.error('Sync save failed:', error);
+            showNotification(`Save failed: ${error.message}`, 'error');
+        }
+    });
+}
+
+const syncLoadBtn = document.getElementById('syncLoadBtn');
+if (syncLoadBtn) {
+    syncLoadBtn.addEventListener('click', async () => {
+        const syncProfileIdInput = document.getElementById('syncProfileId');
+        if (!syncProfileIdInput) return;
+
+        const profileId = sanitizeProfileId(syncProfileIdInput.value);
+        if (!profileId) {
+            showNotification('Enter a valid Profile ID first.', 'error');
+            return;
+        }
+
+        syncProfileIdInput.value = profileId;
+        localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, profileId);
+
+        try {
+            const response = await fetch(`/api/history/sync/${encodeURIComponent(profileId)}`);
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.error || 'Sync load failed');
+            }
+
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(payload.history || []));
+            if (typeof payload.goalTarget === 'number') {
+                saveScoreGoal(Math.min(100, Math.max(1, Math.round(payload.goalTarget))));
+            }
+
+            renderHistorySection();
+            showNotification('Cloud data loaded.', 'success');
+        } catch (error) {
+            console.error('Sync load failed:', error);
+            showNotification(`Load failed: ${error.message}`, 'error');
+        }
+    });
+}

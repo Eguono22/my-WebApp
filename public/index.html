@@ -219,6 +219,18 @@
                     </button>
                 </div>
 
+                <div class="post-assessment-cta">
+                    <h3 id="ctaTitle">
+                        <i class="fas fa-bullseye"></i>
+                        Next Step
+                    </h3>
+                    <p id="ctaMessage">Get a personalized action plan based on your assessment.</p>
+                    <button id="ctaPrimaryBtn" class="btn-cta-primary">
+                        <i class="fas fa-route"></i>
+                        Build My Action Plan
+                    </button>
+                </div>
+
                 <div class="action-buttons">
                     <button onclick="resetForm()" class="btn-reset">
                         <i class="fas fa-redo"></i>
@@ -227,6 +239,86 @@
                     <button id="shareResultsBtn" class="btn-share">
                         <i class="fas fa-share-nodes"></i>
                         Share Results
+                    </button>
+                </div>
+            </div>
+
+            <div id="historySection" class="history-section" style="display: none;">
+                <div class="section-header">
+                    <i class="fas fa-chart-simple"></i>
+                    <h2>Your Progress History</h2>
+                </div>
+
+                <div class="history-goal-card">
+                    <h3>
+                        <i class="fas fa-bullseye"></i>
+                        Score Goal Tracking
+                    </h3>
+                    <div class="goal-controls">
+                        <label for="scoreGoalInput">Target Score</label>
+                        <input type="number" id="scoreGoalInput" min="1" max="100" value="85">
+                        <button id="saveGoalBtn" class="btn-ask-ai" type="button">
+                            <i class="fas fa-save"></i>
+                            Save Goal
+                        </button>
+                    </div>
+                    <div class="goal-progress-wrap">
+                        <div class="goal-progress">
+                            <div id="goalProgressBar" class="goal-progress-bar"></div>
+                        </div>
+                        <p id="goalProgressText">Set a target score to track your progress.</p>
+                    </div>
+                </div>
+
+                <div class="history-chart-card">
+                    <h3>
+                        <i class="fas fa-chart-line"></i>
+                        Overall Health Score Trend
+                    </h3>
+                    <div class="history-controls">
+                        <label for="historyMetricSelect">Trend Metric</label>
+                        <select id="historyMetricSelect">
+                            <option value="overallScore">Overall Score</option>
+                            <option value="bmi">BMI</option>
+                            <option value="sleepHours">Sleep (hours/night)</option>
+                            <option value="exerciseHours">Exercise (hours/week)</option>
+                            <option value="stressLevel">Stress Level</option>
+                            <option value="heartRate">Heart Rate (bpm)</option>
+                            <option value="systolic">Systolic BP (mmHg)</option>
+                            <option value="diastolic">Diastolic BP (mmHg)</option>
+                        </select>
+                    </div>
+                    <canvas id="historyTrendChart" height="120"></canvas>
+                </div>
+
+                <div class="history-sync-card">
+                    <h3>
+                        <i class="fas fa-cloud-arrow-up"></i>
+                        Sync Across Devices
+                    </h3>
+                    <p class="sync-help">Use a Profile ID (letters, numbers, -, _) on each device.</p>
+                    <div class="sync-controls">
+                        <input type="text" id="syncProfileId" placeholder="e.g. myhealthprofile01" maxlength="40">
+                        <button id="syncSaveBtn" class="btn-submit" type="button">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Save To Cloud
+                        </button>
+                        <button id="syncLoadBtn" class="btn-share" type="button">
+                            <i class="fas fa-cloud-download-alt"></i>
+                            Load From Cloud
+                        </button>
+                    </div>
+                </div>
+
+                <div class="history-list-card">
+                    <h3>
+                        <i class="fas fa-clock-rotate-left"></i>
+                        Recent Assessments
+                    </h3>
+                    <div id="historyList"></div>
+                    <button id="clearHistoryBtn" class="btn-reset">
+                        <i class="fas fa-trash"></i>
+                        Clear History
                     </button>
                 </div>
             </div>
@@ -246,6 +338,7 @@
         </footer>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

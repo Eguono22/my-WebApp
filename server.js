@@ -1,10 +1,47 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs/promises');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static('public'));
+
+const SYNC_DATA_FILE = path.join(__dirname, 'data', 'syncedHistory.json');
+
+function sanitizeProfileId(rawId) {
+  return String(rawId || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 40);
+}
+
+async function ensureSyncDataFile() {
+  const dirPath = path.dirname(SYNC_DATA_FILE);
+  await fs.mkdir(dirPath, { recursive: true });
+  try {
+    await fs.access(SYNC_DATA_FILE);
+  } catch {
+    await fs.writeFile(SYNC_DATA_FILE, JSON.stringify({}), 'utf8');
+  }
+}
+
+async function readSyncStore() {
+  await ensureSyncDataFile();
+  const raw = await fs.readFile(SYNC_DATA_FILE, 'utf8');
+  if (!raw.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeSyncStore(store) {
+  await ensureSyncDataFile();
+  await fs.writeFile(SYNC_DATA_FILE, JSON.stringify(store, null, 2), 'utf8');
+}
 
 // Health Assessment AI Algorithm
 class HealthAssessmentAI {
@@ -421,6 +458,84 @@ app.post('/api/assess', (req, res) => {
     res.status(500).json({ 
       error: 'An error occurred during health assessment' 
     });
+  }
+});
+
+app.post('/api/history/sync', async (req, res) => {
+  try {
+    const { profileId: rawProfileId, history, goalTarget } = req.body || {};
+    const profileId = sanitizeProfileId(rawProfileId);
+
+    if (!profileId) {
+      return res.status(400).json({ error: 'Valid profileId is required' });
+    }
+
+    if (!Array.isArray(history)) {
+      return res.status(400).json({ error: 'history must be an array' });
+    }
+
+    if (history.length > 500) {
+      return res.status(400).json({ error: 'history cannot exceed 500 entries' });
+    }
+
+    const normalizedHistory = history.map((entry) => ({
+      id: String(entry.id || ''),
+      createdAt: String(entry.createdAt || ''),
+      overallScore: Number(entry.overallScore || 0),
+      status: String(entry.status || ''),
+      bmi: Number(entry.bmi || 0),
+      age: Number(entry.age || 0),
+      systolic: Number(entry.systolic || 0),
+      diastolic: Number(entry.diastolic || 0),
+      heartRate: Number(entry.heartRate || 0),
+      exerciseHours: Number(entry.exerciseHours || 0),
+      sleepHours: Number(entry.sleepHours || 0),
+      stressLevel: Number(entry.stressLevel || 0)
+    }));
+
+    const safeGoal = Math.min(100, Math.max(1, Number(goalTarget || 85)));
+    const store = await readSyncStore();
+    store[profileId] = {
+      history: normalizedHistory,
+      goalTarget: safeGoal,
+      updatedAt: new Date().toISOString()
+    };
+
+    await writeSyncStore(store);
+    return res.json({
+      ok: true,
+      updatedAt: store[profileId].updatedAt,
+      records: normalizedHistory.length
+    });
+  } catch (error) {
+    console.error('History sync save error:', error);
+    return res.status(500).json({ error: 'Unable to save sync data' });
+  }
+});
+
+app.get('/api/history/sync/:profileId', async (req, res) => {
+  try {
+    const profileId = sanitizeProfileId(req.params.profileId);
+
+    if (!profileId) {
+      return res.status(400).json({ error: 'Valid profileId is required' });
+    }
+
+    const store = await readSyncStore();
+    const data = store[profileId];
+
+    if (!data) {
+      return res.status(404).json({ error: 'No synced data found for this profileId' });
+    }
+
+    return res.json({
+      history: Array.isArray(data.history) ? data.history : [],
+      goalTarget: Number(data.goalTarget || 85),
+      updatedAt: data.updatedAt || null
+    });
+  } catch (error) {
+    console.error('History sync load error:', error);
+    return res.status(500).json({ error: 'Unable to load sync data' });
   }
 });
 
