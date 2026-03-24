@@ -245,14 +245,23 @@ header h1 {
     border-color: #a5b4fc;
 }
 
-/* Auth Section */
-.auth-section {
+/* Auth Gate */
+.auth-gate {
+    padding: 34px 34px 10px;
+}
+
+.auth-gate-card {
     background: white;
     border-radius: 20px;
     padding: 30px;
     margin-bottom: 30px;
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border-color);
+}
+
+.auth-gate-subtitle {
+    color: var(--text-secondary);
+    margin: -4px 0 20px;
 }
 
 .auth-forms {
@@ -300,7 +309,7 @@ header h1 {
     width: 100%;
 }
 
-.auth-status {
+.auth-status-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -309,9 +318,10 @@ header h1 {
     border-radius: 12px;
     border: 1px solid var(--border-color);
     background: var(--bg-light);
+    margin-bottom: 26px;
 }
 
-.auth-status p {
+.auth-status-bar p {
     margin: 0;
     color: var(--text-secondary);
 }
@@ -1275,7 +1285,7 @@ footer {
         grid-template-columns: 1fr;
     }
 
-    .auth-status {
+    .auth-status-bar {
         flex-direction: column;
         align-items: flex-start;
     }

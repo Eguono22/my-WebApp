@@ -124,6 +124,22 @@ async function getUserFromToken(token) {
   };
 }
 
+async function requireAuth(req, res, next) {
+  try {
+    const token = getAuthToken(req);
+    const user = await getUserFromToken(token);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+
+    req.authUser = user;
+    return next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    return res.status(500).json({ error: 'Unable to validate session.' });
+  }
+}
+
 // Health Assessment AI Algorithm
 class HealthAssessmentAI {
   constructor() {
@@ -581,7 +597,7 @@ app.post('/api/auth/logout', async (req, res) => {
 });
 
 // API endpoint for AI chat
-app.post('/api/chat', (req, res) => {
+app.post('/api/chat', requireAuth, (req, res) => {
   try {
     const { message, context } = req.body;
     
@@ -601,7 +617,7 @@ app.post('/api/chat', (req, res) => {
 });
 
 // API endpoint for health assessment
-app.post('/api/assess', (req, res) => {
+app.post('/api/assess', requireAuth, (req, res) => {
   try {
     const healthData = req.body;
     
