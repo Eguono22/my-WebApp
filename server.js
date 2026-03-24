@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs/promises');
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -8,6 +9,8 @@ app.use(express.json());
 app.use(express.static('public'));
 
 const SYNC_DATA_FILE = path.join(__dirname, 'data', 'syncedHistory.json');
+const USERS_DATA_FILE = path.join(__dirname, 'data', 'users.json');
+const SESSIONS_DATA_FILE = path.join(__dirname, 'data', 'sessions.json');
 
 function sanitizeProfileId(rawId) {
   return String(rawId || '')
@@ -41,6 +44,84 @@ async function readSyncStore() {
 async function writeSyncStore(store) {
   await ensureSyncDataFile();
   await fs.writeFile(SYNC_DATA_FILE, JSON.stringify(store, null, 2), 'utf8');
+}
+
+async function ensureJsonFile(filePath) {
+  const dirPath = path.dirname(filePath);
+  await fs.mkdir(dirPath, { recursive: true });
+  try {
+    await fs.access(filePath);
+  } catch {
+    await fs.writeFile(filePath, JSON.stringify({}), 'utf8');
+  }
+}
+
+async function readJsonStore(filePath) {
+  await ensureJsonFile(filePath);
+  const raw = await fs.readFile(filePath, 'utf8');
+  if (!raw.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeJsonStore(filePath, store) {
+  await ensureJsonFile(filePath);
+  await fs.writeFile(filePath, JSON.stringify(store, null, 2), 'utf8');
+}
+
+function normalizeUsername(rawUsername) {
+  return String(rawUsername || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 30);
+}
+
+function isValidPassword(password) {
+  return typeof password === 'string' && password.length >= 8 && password.length <= 72;
+}
+
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex');
+  return { salt, hash: derivedKey };
+}
+
+function verifyPassword(password, salt, expectedHash) {
+  const { hash } = hashPassword(password, salt);
+  const expectedBuffer = Buffer.from(expectedHash, 'hex');
+  const receivedBuffer = Buffer.from(hash, 'hex');
+
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+function getAuthToken(req) {
+  const authHeader = String(req.headers.authorization || '');
+  if (!authHeader.startsWith('Bearer ')) return null;
+  return authHeader.slice(7).trim();
+}
+
+async function getUserFromToken(token) {
+  if (!token) return null;
+  const sessions = await readJsonStore(SESSIONS_DATA_FILE);
+  const session = sessions[token];
+  if (!session || !session.username) return null;
+
+  const users = await readJsonStore(USERS_DATA_FILE);
+  const user = users[session.username];
+  if (!user) return null;
+
+  return {
+    username: session.username,
+    createdAt: user.createdAt || null
+  };
 }
 
 // Health Assessment AI Algorithm
@@ -387,6 +468,117 @@ class HealthChatAgent {
 }
 
 const chatAgent = new HealthChatAgent();
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username: rawUsername, password } = req.body || {};
+    const username = normalizeUsername(rawUsername);
+
+    if (!username || username.length < 3) {
+      return res.status(400).json({ error: 'Username must be 3-30 characters (letters, numbers, - or _).' });
+    }
+
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ error: 'Password must be 8-72 characters.' });
+    }
+
+    const users = await readJsonStore(USERS_DATA_FILE);
+    if (users[username]) {
+      return res.status(409).json({ error: 'Username already exists.' });
+    }
+
+    const { salt, hash } = hashPassword(password);
+    users[username] = {
+      username,
+      passwordSalt: salt,
+      passwordHash: hash,
+      createdAt: new Date().toISOString()
+    };
+
+    await writeJsonStore(USERS_DATA_FILE, users);
+    return res.status(201).json({ ok: true, username });
+  } catch (error) {
+    console.error('Register error:', error);
+    return res.status(500).json({ error: 'Unable to register user.' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username: rawUsername, password } = req.body || {};
+    const username = normalizeUsername(rawUsername);
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    const users = await readJsonStore(USERS_DATA_FILE);
+    const user = users[username];
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password.' });
+    }
+
+    const isValid = verifyPassword(password, user.passwordSalt, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid username or password.' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const sessions = await readJsonStore(SESSIONS_DATA_FILE);
+    sessions[token] = {
+      username,
+      createdAt: new Date().toISOString()
+    };
+    await writeJsonStore(SESSIONS_DATA_FILE, sessions);
+
+    return res.json({
+      ok: true,
+      token,
+      username
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({ error: 'Unable to login.' });
+  }
+});
+
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const token = getAuthToken(req);
+    const user = await getUserFromToken(token);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated.' });
+    }
+
+    return res.json({
+      ok: true,
+      username: user.username,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    console.error('Auth me error:', error);
+    return res.status(500).json({ error: 'Unable to fetch user session.' });
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const token = getAuthToken(req);
+    if (!token) {
+      return res.status(400).json({ error: 'Missing auth token.' });
+    }
+
+    const sessions = await readJsonStore(SESSIONS_DATA_FILE);
+    delete sessions[token];
+    await writeJsonStore(SESSIONS_DATA_FILE, sessions);
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({ error: 'Unable to logout.' });
+  }
+});
 
 // API endpoint for AI chat
 app.post('/api/chat', (req, res) => {

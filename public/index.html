@@ -63,6 +63,47 @@
         </header>
 
         <div class="main-content">
+            <div class="auth-section">
+                <div class="section-header">
+                    <i class="fas fa-user-lock"></i>
+                    <h2>Account</h2>
+                </div>
+
+                <div id="authStatus" class="auth-status" style="display: none;">
+                    <p>Signed in as <strong id="authUsername">--</strong></p>
+                    <button id="logoutBtn" class="btn-share" type="button">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
+                </div>
+
+                <div id="authForms" class="auth-forms">
+                    <form id="registerForm" class="auth-card">
+                        <h3>Create Account</h3>
+                        <label for="registerUsername">Username</label>
+                        <input type="text" id="registerUsername" minlength="3" maxlength="30" required>
+                        <label for="registerPassword">Password</label>
+                        <input type="password" id="registerPassword" minlength="8" maxlength="72" required>
+                        <button type="submit" class="btn-submit">
+                            <i class="fas fa-user-plus"></i>
+                            Register
+                        </button>
+                    </form>
+
+                    <form id="loginForm" class="auth-card">
+                        <h3>Login</h3>
+                        <label for="loginUsername">Username</label>
+                        <input type="text" id="loginUsername" minlength="3" maxlength="30" required>
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" minlength="8" maxlength="72" required>
+                        <button type="submit" class="btn-ask-ai">
+                            <i class="fas fa-right-to-bracket"></i>
+                            Login
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <div class="form-section">
                 <div class="section-header">
                     <i class="fas fa-clipboard-list"></i>

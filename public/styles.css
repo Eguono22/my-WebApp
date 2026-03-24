@@ -245,6 +245,84 @@ header h1 {
     border-color: #a5b4fc;
 }
 
+/* Auth Section */
+.auth-section {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+}
+
+.auth-forms {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.auth-card {
+    background: var(--bg-light);
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    padding: 20px;
+}
+
+.auth-card h3 {
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.auth-card label {
+    display: block;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin: 8px 0 6px;
+}
+
+.auth-card input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    font-family: inherit;
+}
+
+.auth-card input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.auth-card .btn-submit,
+.auth-card .btn-ask-ai {
+    margin-top: 14px;
+    width: 100%;
+}
+
+.auth-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-light);
+}
+
+.auth-status p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+#logoutBtn {
+    width: auto;
+    margin: 0;
+    padding: 10px 14px;
+    font-size: 0.95em;
+}
+
 /* Buttons */
 .btn-submit,
 .btn-reset,
@@ -1191,6 +1269,15 @@ footer {
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .auth-forms {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-status {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .action-buttons {
