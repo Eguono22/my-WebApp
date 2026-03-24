@@ -4,8 +4,6 @@ let currentAssessmentData = null;
 const HISTORY_STORAGE_KEY = 'healthAssessmentHistoryV1';
 const SCORE_GOAL_STORAGE_KEY = 'healthAssessmentScoreGoalV1';
 const SYNC_PROFILE_STORAGE_KEY = 'healthAssessmentSyncProfileV1';
-const AUTH_TOKEN_STORAGE_KEY = 'healthAssessmentAuthTokenV1';
-const AUTH_USER_STORAGE_KEY = 'healthAssessmentAuthUserV1';
 let trendChart = null;
 let selectedHistoryMetric = 'overallScore';
 
@@ -747,102 +745,6 @@ function sanitizeProfileId(rawId) {
     return (rawId || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
 }
 
-function getAuthToken() {
-    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '';
-}
-
-function getAuthUsername() {
-    return localStorage.getItem(AUTH_USER_STORAGE_KEY) || '';
-}
-
-function setAuthSession(token, username) {
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
-    localStorage.setItem(AUTH_USER_STORAGE_KEY, username);
-    updateAuthUI(username);
-}
-
-function clearAuthSession() {
-    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-    updateAuthUI('');
-}
-
-function getAuthHeaders() {
-    const token = getAuthToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-function updateAuthUI(username) {
-    const authStatus = document.getElementById('authStatus');
-    const authForms = document.getElementById('authForms');
-    const authUsername = document.getElementById('authUsername');
-    const syncProfileIdInput = document.getElementById('syncProfileId');
-    const normalized = sanitizeProfileId(username);
-
-    if (normalized) {
-        if (authStatus) authStatus.style.display = 'flex';
-        if (authForms) authForms.style.display = 'none';
-        if (authUsername) authUsername.textContent = normalized;
-        if (syncProfileIdInput) {
-            syncProfileIdInput.value = normalized;
-            syncProfileIdInput.readOnly = true;
-        }
-        localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, normalized);
-    } else {
-        if (authStatus) authStatus.style.display = 'none';
-        if (authForms) authForms.style.display = 'grid';
-        if (authUsername) authUsername.textContent = '--';
-        if (syncProfileIdInput) {
-            syncProfileIdInput.readOnly = false;
-            syncProfileIdInput.value = localStorage.getItem(SYNC_PROFILE_STORAGE_KEY) || '';
-        }
-    }
-}
-
-async function restoreAuthSession() {
-    const token = getAuthToken();
-    const localUser = getAuthUsername();
-
-    if (!token || !localUser) {
-        updateAuthUI('');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/auth/me', {
-            headers: {
-                ...getAuthHeaders()
-            }
-        });
-
-        if (!response.ok) {
-            clearAuthSession();
-            return;
-        }
-
-        const payload = await response.json();
-        const serverUser = sanitizeProfileId(payload.username || '');
-        if (!serverUser) {
-            clearAuthSession();
-            return;
-        }
-
-        localStorage.setItem(AUTH_USER_STORAGE_KEY, serverUser);
-        updateAuthUI(serverUser);
-    } catch (error) {
-        console.error('Session restore failed:', error);
-        clearAuthSession();
-    }
-}
-
-function getActiveProfileId() {
-    const authUser = sanitizeProfileId(getAuthUsername());
-    if (authUser) return authUser;
-
-    const syncProfileIdInput = document.getElementById('syncProfileId');
-    return sanitizeProfileId(syncProfileIdInput ? syncProfileIdInput.value : '');
-}
-
 // Welcome message on page load
 window.addEventListener('load', () => {
     const scoreGoalInput = document.getElementById('scoreGoalInput');
@@ -855,7 +757,6 @@ window.addEventListener('load', () => {
         syncProfileIdInput.value = localStorage.getItem(SYNC_PROFILE_STORAGE_KEY) || '';
     }
 
-    restoreAuthSession();
     renderHistorySection();
     setTimeout(() => {
         showNotification('Welcome! Start your health assessment or chat with our AI assistant.', 'info');
@@ -907,7 +808,7 @@ if (syncSaveBtn) {
         const syncProfileIdInput = document.getElementById('syncProfileId');
         if (!syncProfileIdInput) return;
 
-        const profileId = getActiveProfileId();
+        const profileId = sanitizeProfileId(syncProfileIdInput.value);
         if (!profileId) {
             showNotification('Enter a valid Profile ID first.', 'error');
             return;
@@ -946,7 +847,7 @@ if (syncLoadBtn) {
         const syncProfileIdInput = document.getElementById('syncProfileId');
         if (!syncProfileIdInput) return;
 
-        const profileId = getActiveProfileId();
+        const profileId = sanitizeProfileId(syncProfileIdInput.value);
         if (!profileId) {
             showNotification('Enter a valid Profile ID first.', 'error');
             return;
@@ -972,97 +873,6 @@ if (syncLoadBtn) {
         } catch (error) {
             console.error('Sync load failed:', error);
             showNotification(`Load failed: ${error.message}`, 'error');
-        }
-    });
-}
-
-const registerForm = document.getElementById('registerForm');
-if (registerForm) {
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const usernameInput = document.getElementById('registerUsername');
-        const passwordInput = document.getElementById('registerPassword');
-        if (!usernameInput || !passwordInput) return;
-
-        const username = usernameInput.value.trim();
-        const password = passwordInput.value;
-
-        try {
-            const response = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-
-            const payload = await response.json();
-            if (!response.ok) {
-                throw new Error(payload.error || 'Registration failed');
-            }
-
-            showNotification('Account created. You can now login.', 'success');
-            registerForm.reset();
-
-            const loginUsername = document.getElementById('loginUsername');
-            if (loginUsername) {
-                loginUsername.value = sanitizeProfileId(payload.username || username);
-            }
-        } catch (error) {
-            console.error('Registration failed:', error);
-            showNotification(`Register failed: ${error.message}`, 'error');
-        }
-    });
-}
-
-const loginForm = document.getElementById('loginForm');
-if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const usernameInput = document.getElementById('loginUsername');
-        const passwordInput = document.getElementById('loginPassword');
-        if (!usernameInput || !passwordInput) return;
-
-        const username = usernameInput.value.trim();
-        const password = passwordInput.value;
-
-        try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-
-            const payload = await response.json();
-            if (!response.ok) {
-                throw new Error(payload.error || 'Login failed');
-            }
-
-            setAuthSession(payload.token, sanitizeProfileId(payload.username || username));
-            loginForm.reset();
-            showNotification('Logged in successfully.', 'success');
-        } catch (error) {
-            console.error('Login failed:', error);
-            showNotification(`Login failed: ${error.message}`, 'error');
-        }
-    });
-}
-
-const logoutBtn = document.getElementById('logoutBtn');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-        try {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {
-                    ...getAuthHeaders()
-                }
-            });
-        } catch (error) {
-            console.error('Logout request failed:', error);
-        } finally {
-            clearAuthSession();
-            showNotification('Logged out.', 'success');
         }
     });
 }
