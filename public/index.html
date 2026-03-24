@@ -19,7 +19,7 @@
 </head>
 <body>
     <!-- AI Chat Button -->
-    <button id="aiChatBtn" class="ai-chat-toggle" title="Chat with AI Health Assistant" style="display: none;">
+    <button id="aiChatBtn" class="ai-chat-toggle" title="Chat with AI Health Assistant">
         <i class="fas fa-robot"></i>
     </button>
 
@@ -62,14 +62,22 @@
             </div>
         </header>
 
-        <div id="authGate" class="auth-gate">
-            <div class="auth-gate-card">
+        <div class="main-content">
+            <div class="auth-section">
                 <div class="section-header">
                     <i class="fas fa-user-lock"></i>
-                    <h2>Login To Continue</h2>
+                    <h2>Account</h2>
                 </div>
-                <p class="auth-gate-subtitle">Create an account or log in before entering the AI Health Assessment System.</p>
-                <div class="auth-forms auth-gate-forms">
+
+                <div id="authStatus" class="auth-status" style="display: none;">
+                    <p>Signed in as <strong id="authUsername">--</strong></p>
+                    <button id="logoutBtn" class="btn-share" type="button">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
+                </div>
+
+                <div id="authForms" class="auth-forms">
                     <form id="registerForm" class="auth-card">
                         <h3>Create Account</h3>
                         <label for="registerUsername">Username</label>
@@ -94,16 +102,6 @@
                         </button>
                     </form>
                 </div>
-            </div>
-        </div>
-
-        <div id="mainAppContent" class="main-content" style="display: none;">
-            <div class="auth-status-bar">
-                <p>Signed in as <strong id="authUsername">--</strong></p>
-                <button id="logoutBtn" class="btn-share" type="button">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Logout
-                </button>
             </div>
 
             <div class="form-section">

@@ -104,17 +104,12 @@ document.getElementById('healthForm').addEventListener('submit', async (e) => {
         const response = await fetch('/api/assess', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(formData)
         });
 
         if (!response.ok) {
-            if (response.status === 401) {
-                clearAuthSession();
-                throw new Error('Please login to continue');
-            }
             throw new Error('Assessment failed');
         }
 
@@ -591,8 +586,7 @@ async function sendMessage() {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 message: message,
@@ -601,10 +595,6 @@ async function sendMessage() {
         });
         
         if (!response.ok) {
-            if (response.status === 401) {
-                clearAuthSession();
-                throw new Error('Please login to continue');
-            }
             throw new Error('Chat request failed');
         }
         
@@ -783,34 +773,29 @@ function getAuthHeaders() {
 }
 
 function updateAuthUI(username) {
-    const authGate = document.getElementById('authGate');
-    const mainAppContent = document.getElementById('mainAppContent');
+    const authStatus = document.getElementById('authStatus');
+    const authForms = document.getElementById('authForms');
     const authUsername = document.getElementById('authUsername');
     const syncProfileIdInput = document.getElementById('syncProfileId');
-    const aiChatBtn = document.getElementById('aiChatBtn');
-    const aiChatPanel = document.getElementById('aiChatPanel');
     const normalized = sanitizeProfileId(username);
 
     if (normalized) {
-        if (authGate) authGate.style.display = 'none';
-        if (mainAppContent) mainAppContent.style.display = 'block';
+        if (authStatus) authStatus.style.display = 'flex';
+        if (authForms) authForms.style.display = 'none';
         if (authUsername) authUsername.textContent = normalized;
         if (syncProfileIdInput) {
             syncProfileIdInput.value = normalized;
             syncProfileIdInput.readOnly = true;
         }
-        if (aiChatBtn) aiChatBtn.style.display = 'flex';
         localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, normalized);
     } else {
-        if (authGate) authGate.style.display = 'block';
-        if (mainAppContent) mainAppContent.style.display = 'none';
+        if (authStatus) authStatus.style.display = 'none';
+        if (authForms) authForms.style.display = 'grid';
         if (authUsername) authUsername.textContent = '--';
         if (syncProfileIdInput) {
             syncProfileIdInput.readOnly = false;
             syncProfileIdInput.value = localStorage.getItem(SYNC_PROFILE_STORAGE_KEY) || '';
         }
-        if (aiChatPanel) aiChatPanel.classList.remove('active');
-        if (aiChatBtn) aiChatBtn.style.display = 'none';
     }
 }
 
@@ -859,7 +844,7 @@ function getActiveProfileId() {
 }
 
 // Welcome message on page load
-window.addEventListener('load', async () => {
+window.addEventListener('load', () => {
     const scoreGoalInput = document.getElementById('scoreGoalInput');
     if (scoreGoalInput) {
         scoreGoalInput.value = String(getSavedScoreGoal());
@@ -870,14 +855,11 @@ window.addEventListener('load', async () => {
         syncProfileIdInput.value = localStorage.getItem(SYNC_PROFILE_STORAGE_KEY) || '';
     }
 
-    updateAuthUI('');
-    await restoreAuthSession();
+    restoreAuthSession();
     renderHistorySection();
-    if (getAuthUsername()) {
-        setTimeout(() => {
-            showNotification('Welcome back. You are now inside the AI Health Assessment System.', 'info');
-        }, 700);
-    }
+    setTimeout(() => {
+        showNotification('Welcome! Start your health assessment or chat with our AI assistant.', 'info');
+    }, 1000);
 });
 
 const historyMetricSelect = document.getElementById('historyMetricSelect');
