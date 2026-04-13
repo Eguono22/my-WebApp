@@ -3,33 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Health Assessment System</title>
-    <meta name="description" content="HealthAssessmentHub provides AI-powered health assessments with personalized recommendations based on your wellness metrics.">
+    <title>Health Assessment Hub</title>
+    <meta name="description" content="HealthAssessmentHub helps you review key wellness metrics, track progress over time, and get practical health guidance.">
     <link rel="canonical" href="https://healthassessmenthub.com">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Health Assessment Hub">
-    <meta property="og:title" content="AI Health Assessment System">
-    <meta property="og:description" content="Get an instant AI-powered health assessment and practical recommendations tailored to your metrics.">
+    <meta property="og:title" content="Health Assessment Hub">
+    <meta property="og:description" content="Review your wellness metrics, track progress over time, and get practical health guidance.">
     <meta property="og:url" content="https://healthassessmenthub.com">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="AI Health Assessment System">
-    <meta name="twitter:description" content="Get an instant AI-powered health assessment and practical recommendations tailored to your metrics.">
+    <meta name="twitter:title" content="Health Assessment Hub">
+    <meta name="twitter:description" content="Review your wellness metrics, track progress over time, and get practical health guidance.">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- AI Chat Button -->
-    <button id="aiChatBtn" class="ai-chat-toggle" title="Chat with AI Health Assistant">
+    <!-- Health Chat Button -->
+    <button id="aiChatBtn" class="ai-chat-toggle" title="Chat with the Health Assistant" aria-label="Open health assistant chat">
         <i class="fas fa-robot"></i>
     </button>
 
-    <!-- AI Chat Panel -->
+    <!-- Health Chat Panel -->
     <div id="aiChatPanel" class="ai-chat-panel">
         <div class="chat-header">
             <div class="chat-header-content">
                 <i class="fas fa-robot"></i>
                 <div>
-                    <h3>AI Health Assistant</h3>
+                    <h3>Health Assistant</h3>
                     <span class="status-indicator">Online</span>
                 </div>
             </div>
@@ -40,7 +40,7 @@
         <div id="chatMessages" class="chat-messages">
             <div class="message bot-message">
                 <div class="message-content">
-                    <p>👋 Hello! I'm your AI Health Assistant. I can help you understand your health assessment results, answer health-related questions, and provide personalized wellness advice.</p>
+                    <p>Hello! I'm your Health Assistant. I can help you understand your assessment results, answer general wellness questions, and suggest practical next steps.</p>
                     <p class="message-time">Just now</p>
                 </div>
             </div>
@@ -57,8 +57,8 @@
         <header>
             <div class="header-content">
                 <i class="fas fa-heartbeat header-icon"></i>
-                <h1>AI Health Assessment System</h1>
-                <p class="subtitle">Advanced AI-powered health analysis and personalized recommendations</p>
+                <h1>Health Assessment Hub</h1>
+                <p class="subtitle">Review key wellness metrics, track progress, and get practical health guidance.</p>
             </div>
         </header>
 
@@ -66,16 +66,42 @@
             <div class="form-section">
                 <div class="section-header">
                     <i class="fas fa-clipboard-list"></i>
-                    <h2>Enter Your Health Information</h2>
+                    <div>
+                        <h2>Enter Your Health Information</h2>
+                        <p class="form-intro">Most people finish this check in under a minute. Start with an example or continue where you left off.</p>
+                    </div>
                 </div>
                 <form id="healthForm">
+                    <div class="form-onboarding-card">
+                        <div class="form-onboarding-header">
+                            <div>
+                                <p class="form-progress-label">Assessment Progress</p>
+                                <strong id="formProgressText" aria-live="polite">0 of 9 fields completed</strong>
+                            </div>
+                            <div class="form-progress-pill" id="formProgressPill">0%</div>
+                        </div>
+                        <div class="form-progress-track">
+                            <div id="formProgressBar" class="form-progress-bar"></div>
+                        </div>
+                        <div class="form-quick-actions">
+                            <button id="useExampleBtn" class="btn-secondary-action" type="button" aria-label="Fill the form with example health data">
+                                <i class="fas fa-wand-magic-sparkles"></i>
+                                Use Example Data
+                            </button>
+                            <button id="clearDraftBtn" class="btn-secondary-action" type="button" aria-label="Clear the current draft health form">
+                                <i class="fas fa-eraser"></i>
+                                Clear Draft
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="age">
                                 <i class="fas fa-calendar"></i>
                                 Age (years)
                             </label>
-                            <input type="number" id="age" name="age" min="1" max="120" required>
+                            <input type="number" id="age" name="age" min="1" max="120" placeholder="e.g. 34" required>
                         </div>
 
                         <div class="form-group">
@@ -83,7 +109,7 @@
                                 <i class="fas fa-weight"></i>
                                 Weight (kg)
                             </label>
-                            <input type="number" id="weight" name="weight" min="20" max="300" step="0.1" required>
+                            <input type="number" id="weight" name="weight" min="20" max="300" step="0.1" placeholder="e.g. 72.5" required>
                         </div>
 
                         <div class="form-group">
@@ -91,7 +117,7 @@
                                 <i class="fas fa-ruler-vertical"></i>
                                 Height (cm)
                             </label>
-                            <input type="number" id="height" name="height" min="100" max="250" required>
+                            <input type="number" id="height" name="height" min="100" max="250" placeholder="e.g. 175" required>
                         </div>
 
                         <div class="form-group">
@@ -99,7 +125,8 @@
                                 <i class="fas fa-heartbeat"></i>
                                 Resting Heart Rate (bpm)
                             </label>
-                            <input type="number" id="heartRate" name="heartRate" min="40" max="200" required>
+                            <input type="number" id="heartRate" name="heartRate" min="40" max="200" placeholder="e.g. 64" required>
+                            <p class="form-help">Use your resting number, ideally measured while calm or shortly after waking.</p>
                         </div>
                     </div>
 
@@ -113,14 +140,16 @@
                                 <i class="fas fa-tachometer-alt"></i>
                                 Systolic (mmHg)
                             </label>
-                            <input type="number" id="systolic" name="systolic" min="70" max="200" required>
+                            <input type="number" id="systolic" name="systolic" min="70" max="200" placeholder="e.g. 118" required>
+                            <p class="form-help">Top blood pressure number.</p>
                         </div>
                         <div class="form-group">
                             <label for="diastolic">
                                 <i class="fas fa-tachometer-alt"></i>
                                 Diastolic (mmHg)
                             </label>
-                            <input type="number" id="diastolic" name="diastolic" min="40" max="130" required>
+                            <input type="number" id="diastolic" name="diastolic" min="40" max="130" placeholder="e.g. 76" required>
+                            <p class="form-help">Bottom blood pressure number.</p>
                         </div>
                     </div>
 
@@ -134,7 +163,8 @@
                                 <i class="fas fa-running"></i>
                                 Exercise (hours/week)
                             </label>
-                            <input type="number" id="exerciseHours" name="exerciseHours" min="0" max="40" step="0.5" required>
+                            <input type="number" id="exerciseHours" name="exerciseHours" min="0" max="40" step="0.5" placeholder="e.g. 4" required>
+                            <p class="form-help">Count walking, gym sessions, sports, or other intentional exercise.</p>
                         </div>
 
                         <div class="form-group">
@@ -142,7 +172,8 @@
                                 <i class="fas fa-bed"></i>
                                 Sleep (hours/night)
                             </label>
-                            <input type="number" id="sleepHours" name="sleepHours" min="0" max="24" step="0.5" required>
+                            <input type="number" id="sleepHours" name="sleepHours" min="0" max="24" step="0.5" placeholder="e.g. 7.5" required>
+                            <p class="form-help">Use your average night over the last week.</p>
                         </div>
 
                         <div class="form-group span-2">
@@ -158,13 +189,15 @@
                                 <option value="4">😟 High - Feeling stressed</option>
                                 <option value="5">😰 Very High - Overwhelming stress</option>
                             </select>
+                            <p class="form-help">Pick the option that best matches how you have felt most days this week.</p>
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-submit">
+                    <button type="submit" class="btn-submit" aria-label="Analyze my health assessment">
                         <i class="fas fa-chart-line"></i>
                         Analyze My Health
                     </button>
+                    <p class="form-submit-note">Your values stay in this browser unless you choose to sync them with a Profile ID later.</p>
                 </form>
             </div>
 
@@ -210,12 +243,12 @@
                 <div class="recommendations">
                     <h3>
                         <i class="fas fa-lightbulb"></i>
-                        AI-Generated Recommendations
+                        Personalized Recommendations
                     </h3>
                     <ul id="recommendationsList"></ul>
                     <button id="askAiBtn" class="btn-ask-ai">
                         <i class="fas fa-robot"></i>
-                        Ask AI More Questions
+                        Ask a Follow-Up Question
                     </button>
                 </div>
 
@@ -296,7 +329,7 @@
                         <i class="fas fa-cloud-arrow-up"></i>
                         Sync Across Devices
                     </h3>
-                    <p class="sync-help">Use a Profile ID (letters, numbers, -, _) on each device.</p>
+                    <p class="sync-help">Use a Profile ID (letters, numbers, -, _) on each device. Choosing sync stores history and goal data on the server linked to that ID.</p>
                     <div class="sync-controls">
                         <input type="text" id="syncProfileId" placeholder="e.g. myhealthprofile01" maxlength="40">
                         <button id="syncSaveBtn" class="btn-submit" type="button">
@@ -328,11 +361,14 @@
             <div class="footer-content">
                 <p>
                     <i class="fas fa-shield-heart"></i>
-                    <strong>Medical Disclaimer:</strong> This is an AI-based assessment tool for informational and educational purposes only. 
-                    Always consult with qualified healthcare professionals for medical advice, diagnosis, or treatment.
+                    <strong>Medical Disclaimer:</strong> This tool provides educational wellness guidance only and is not a medical diagnosis or treatment service.
+                    Always consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
                 </p>
                 <p class="footer-info">
-                    <i class="fas fa-lock"></i> Your health data is processed securely and never stored.
+                    <i class="fas fa-lock"></i> Assessment history stays on your device unless you choose to sync it with a Profile ID.
+                </p>
+                <p class="footer-info">
+                    <a href="/analytics.html" class="footer-link">View local analytics dashboard</a>
                 </p>
             </div>
         </footer>

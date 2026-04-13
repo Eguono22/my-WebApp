@@ -1,14 +1,14 @@
 # my-WebApp
 
-🏥 **AI Health Assessment System**
+🏥 **Health Assessment System**
 
-An intelligent computer systems application to assess human health using advanced algorithms and machine learning principles.
+A web application that helps people review health metrics using a weighted scoring model, progress history, and guided wellness recommendations.
 
 ## Features
 
-- **AI-Powered Health Assessment**: Uses intelligent algorithms to evaluate multiple health metrics
+- **Weighted Health Assessment**: Uses a rules-based scoring system to evaluate multiple health metrics
 - **Comprehensive Health Analysis**: Analyzes age, BMI, blood pressure, heart rate, exercise, sleep, and stress levels
-- **Personalized Recommendations**: Provides AI-generated health recommendations based on assessment results
+- **Personalized Recommendations**: Provides practical recommendations based on assessment results
 - **User-Friendly Interface**: Clean, modern web interface for easy data input and result visualization
 - **Real-Time Scoring**: Instant health score calculation with detailed breakdowns
 
@@ -62,7 +62,7 @@ The system evaluates the following health metrics with weighted importance:
 
 ## How It Works
 
-The application uses a sophisticated AI algorithm that:
+The application uses a weighted scoring algorithm that:
 
 1. **Collects Data**: Gathers comprehensive health metrics from the user
 2. **Calculates Scores**: Each metric is scored individually using evidence-based health guidelines
@@ -81,11 +81,24 @@ The application uses a sophisticated AI algorithm that:
 
 - **Backend**: Node.js with Express
 - **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
-- **AI Algorithm**: Custom health assessment algorithm with weighted scoring
+- **Assessment Engine**: Custom health assessment algorithm with weighted scoring
 
 ## Disclaimer
 
-⚠️ **Important**: This is an AI-based assessment tool for informational and educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals for medical decisions.
+⚠️ **Important**: This assessment tool is for informational and educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult qualified healthcare professionals for medical decisions.
+
+## Data Handling
+
+- Assessment history is stored in the browser for progress tracking.
+- If a user chooses to use the sync feature, history and goal data are stored server-side in a SQLite database and linked to a Profile ID.
+- For Vercel or other serverless production hosting, move sync storage to a managed database because local SQLite files are not durable across instances.
+
+## Analytics
+
+- The app records lightweight product events such as page views, completed assessments, chat opens, shared results, and sync actions.
+- Analytics events are stored locally in the same SQLite database so you can measure usage before integrating a third-party analytics platform.
+- Open `/analytics.html` locally to view the built-in analytics dashboard and key conversion metrics.
+- The dashboard now includes onboarding funnel signals such as form starts, example-data usage, draft restores, and start-to-complete conversion.
 
 ## License
 

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard</title>
+    <meta name="description" content="Local analytics dashboard for Health Assessment Hub.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="analytics-body">
+    <div class="analytics-shell">
+        <header class="analytics-header">
+            <div>
+                <p class="analytics-kicker">Admin View</p>
+                <h1>Analytics Dashboard</h1>
+                <p class="analytics-subtitle">Track visits, assessment completions, chat engagement, and sync usage.</p>
+            </div>
+            <a class="analytics-home-link" href="/">
+                <i class="fas fa-arrow-left"></i>
+                Back To App
+            </a>
+        </header>
+
+        <section class="analytics-grid">
+            <article class="analytics-card">
+                <p class="analytics-label">Page Views</p>
+                <h2 id="pageViewsValue">--</h2>
+                <p class="analytics-note">Tracked visits to the main app.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Form Starts</p>
+                <h2 id="formStartsValue">--</h2>
+                <p class="analytics-note">Visitors who began entering assessment data.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Assessments Completed</p>
+                <h2 id="assessmentsCompletedValue">--</h2>
+                <p class="analytics-note">Users who finished the health check.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Form Start Rate</p>
+                <h2 id="formStartRateValue">--</h2>
+                <p class="analytics-note">How often visits turn into assessment starts.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Completion Rate</p>
+                <h2 id="completionRateValue">--</h2>
+                <p class="analytics-note">Assessment completions divided by page views.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Start-To-Complete</p>
+                <h2 id="startToCompleteRateValue">--</h2>
+                <p class="analytics-note">Completions divided by started assessments.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Chat Open Rate</p>
+                <h2 id="chatOpenRateValue">--</h2>
+                <p class="analytics-note">How often visitors open the assistant.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Unique Sessions</p>
+                <h2 id="uniqueSessionsValue">--</h2>
+                <p class="analytics-note">Approximate number of tracked sessions.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Average Score</p>
+                <h2 id="averageScoreValue">--</h2>
+                <p class="analytics-note">Average result among completed assessments.</p>
+            </article>
+            <article class="analytics-card">
+                <p class="analytics-label">Example / Draft Restores</p>
+                <h2 id="onboardingHelpersValue">--</h2>
+                <p class="analytics-note">How often onboarding helpers are used.</p>
+            </article>
+        </section>
+
+        <section class="analytics-panels">
+            <article class="analytics-panel">
+                <div class="analytics-panel-head">
+                    <h3>Last 7 Days</h3>
+                    <p id="generatedAtText">Loading summary...</p>
+                </div>
+                <canvas id="analyticsTrendChart" height="110"></canvas>
+            </article>
+
+            <article class="analytics-panel">
+                <div class="analytics-panel-head">
+                    <h3>Top Events</h3>
+                    <p>What users are doing most often.</p>
+                </div>
+                <div id="topEventsList" class="analytics-event-list"></div>
+            </article>
+        </section>
+
+        <section class="analytics-panels">
+            <article class="analytics-panel">
+                <div class="analytics-panel-head">
+                    <h3>Key Signals</h3>
+                    <p>Use these numbers to guide your next product decisions.</p>
+                </div>
+                <div id="signalsList" class="analytics-signal-list"></div>
+            </article>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="analytics.js"></script>
+</body>
+</html>

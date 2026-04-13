@@ -1,11 +1,64 @@
-// Enhanced Health Assessment App with AI Chat Integration
+// Enhanced Health Assessment App with guided chat support
 
 let currentAssessmentData = null;
 const HISTORY_STORAGE_KEY = 'healthAssessmentHistoryV1';
 const SCORE_GOAL_STORAGE_KEY = 'healthAssessmentScoreGoalV1';
 const SYNC_PROFILE_STORAGE_KEY = 'healthAssessmentSyncProfileV1';
+const ANALYTICS_SESSION_STORAGE_KEY = 'healthAssessmentAnalyticsSessionV1';
+const FORM_DRAFT_STORAGE_KEY = 'healthAssessmentFormDraftV1';
 let trendChart = null;
 let selectedHistoryMetric = 'overallScore';
+let hasTrackedFormStart = false;
+const healthForm = document.getElementById('healthForm');
+const healthFormFields = [
+    'age',
+    'weight',
+    'height',
+    'systolic',
+    'diastolic',
+    'heartRate',
+    'exerciseHours',
+    'sleepHours',
+    'stressLevel'
+];
+const exampleAssessmentProfile = {
+    age: '34',
+    weight: '72',
+    height: '175',
+    systolic: '118',
+    diastolic: '76',
+    heartRate: '64',
+    exerciseHours: '4',
+    sleepHours: '7.5',
+    stressLevel: '2'
+};
+
+function getAnalyticsSessionId() {
+    let sessionId = sessionStorage.getItem(ANALYTICS_SESSION_STORAGE_KEY);
+    if (!sessionId) {
+        sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        sessionStorage.setItem(ANALYTICS_SESSION_STORAGE_KEY, sessionId);
+    }
+    return sessionId;
+}
+
+async function trackEvent(eventName, properties = {}) {
+    try {
+        await fetch('/api/analytics/event', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: getAnalyticsSessionId(),
+                eventName,
+                properties
+            })
+        });
+    } catch (error) {
+        console.error('Analytics tracking failed:', error);
+    }
+}
 
 const HISTORY_METRICS = {
     overallScore: {
@@ -74,8 +127,131 @@ const HISTORY_METRICS = {
     }
 };
 
+function getFormDraft() {
+    try {
+        const rawDraft = localStorage.getItem(FORM_DRAFT_STORAGE_KEY);
+        if (!rawDraft) return null;
+        const parsedDraft = JSON.parse(rawDraft);
+        return parsedDraft && typeof parsedDraft === 'object' ? parsedDraft : null;
+    } catch (error) {
+        console.error('Failed to read form draft:', error);
+        return null;
+    }
+}
+
+function saveFormDraft() {
+    try {
+        const draft = {};
+        healthFormFields.forEach((fieldId) => {
+            const field = document.getElementById(fieldId);
+            if (field && field.value !== '') {
+                draft[fieldId] = field.value;
+            }
+        });
+
+        if (Object.keys(draft).length) {
+            localStorage.setItem(FORM_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        } else {
+            localStorage.removeItem(FORM_DRAFT_STORAGE_KEY);
+        }
+    } catch (error) {
+        console.error('Failed to save form draft:', error);
+    }
+}
+
+function clearFormDraft() {
+    localStorage.removeItem(FORM_DRAFT_STORAGE_KEY);
+}
+
+function populateHealthForm(values) {
+    healthFormFields.forEach((fieldId) => {
+        const field = document.getElementById(fieldId);
+        if (field && Object.prototype.hasOwnProperty.call(values, fieldId)) {
+            field.value = values[fieldId];
+        }
+    });
+
+    saveFormDraft();
+    updateFormProgress();
+}
+
+function trackFormStarted(source = 'field_input') {
+    if (hasTrackedFormStart) {
+        return;
+    }
+
+    hasTrackedFormStart = true;
+    trackEvent('form_started', { source });
+}
+
+function updateFormProgress() {
+    const completedFields = healthFormFields.filter((fieldId) => {
+        const field = document.getElementById(fieldId);
+        return field && field.value !== '';
+    }).length;
+    const completionRate = Math.round((completedFields / healthFormFields.length) * 100);
+
+    const progressText = document.getElementById('formProgressText');
+    const progressPill = document.getElementById('formProgressPill');
+    const progressBar = document.getElementById('formProgressBar');
+
+    if (progressText) {
+        progressText.textContent = `${completedFields} of ${healthFormFields.length} fields completed`;
+    }
+
+    if (progressPill) {
+        progressPill.textContent = `${completionRate}%`;
+    }
+
+    if (progressBar) {
+        progressBar.style.width = `${completionRate}%`;
+    }
+}
+
+function initializeFormExperience() {
+    healthFormFields.forEach((fieldId) => {
+        const field = document.getElementById(fieldId);
+        if (!field) return;
+
+        field.addEventListener('input', () => {
+            trackFormStarted('field_input');
+            saveFormDraft();
+            updateFormProgress();
+        });
+
+        field.addEventListener('change', () => {
+            trackFormStarted('field_change');
+            saveFormDraft();
+            updateFormProgress();
+        });
+    });
+
+    const useExampleBtn = document.getElementById('useExampleBtn');
+    if (useExampleBtn) {
+        useExampleBtn.addEventListener('click', () => {
+            trackFormStarted('example_data');
+            populateHealthForm(exampleAssessmentProfile);
+            trackEvent('form_example_used', {
+                source: 'onboarding_card'
+            });
+            showNotification('Example values added. You can adjust anything before submitting.', 'success');
+        });
+    }
+
+    const clearDraftBtn = document.getElementById('clearDraftBtn');
+    if (clearDraftBtn) {
+        clearDraftBtn.addEventListener('click', () => {
+            healthForm.reset();
+            clearFormDraft();
+            updateFormProgress();
+            trackEvent('form_draft_cleared');
+            showNotification('Draft cleared.', 'success');
+        });
+    }
+}
+
 // Health Form Submission
-document.getElementById('healthForm').addEventListener('submit', async (e) => {
+healthForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     // Get form data
@@ -114,6 +290,11 @@ document.getElementById('healthForm').addEventListener('submit', async (e) => {
         const result = await response.json();
         currentAssessmentData = { ...formData, ...result };
         saveAssessmentToHistory(currentAssessmentData);
+        clearFormDraft();
+        trackEvent('assessment_completed', {
+            overallScore: result.overallScore,
+            status: result.status
+        });
         
         // Display results
         displayResults(result);
@@ -307,7 +488,9 @@ function animateValue(element, start, end, duration) {
 
 function resetForm() {
     // Reset the form
-    document.getElementById('healthForm').reset();
+    healthForm.reset();
+    clearFormDraft();
+    updateFormProgress();
     currentAssessmentData = null;
     
     // Show form and hide results
@@ -333,6 +516,9 @@ aiChatBtn.addEventListener('click', () => {
     aiChatPanel.classList.add('active');
     aiChatBtn.style.display = 'none';
     chatInput.focus();
+    trackEvent('chat_opened', {
+        source: 'floating_button'
+    });
 });
 
 closeChatBtn.addEventListener('click', () => {
@@ -346,6 +532,9 @@ if (askAiBtn) {
         aiChatPanel.classList.add('active');
         aiChatBtn.style.display = 'none';
         chatInput.focus();
+        trackEvent('chat_opened', {
+            source: 'results_follow_up'
+        });
         
         // Send initial context message
         if (currentAssessmentData) {
@@ -551,6 +740,9 @@ if (ctaPrimaryBtn) {
         aiChatPanel.classList.add('active');
         aiChatBtn.style.display = 'none';
         chatInput.focus();
+        trackEvent('chat_opened', {
+            source: 'results_cta'
+        });
 
         const prompt = ctaPrimaryBtn.dataset.aiPrompt || 'Create a practical health action plan from my assessment results.';
         setTimeout(() => {
@@ -571,6 +763,11 @@ chatInput.addEventListener('keypress', (e) => {
 async function sendMessage() {
     const message = chatInput.value.trim();
     if (!message) return;
+
+    trackEvent('chat_message_sent', {
+        hasAssessmentContext: Boolean(currentAssessmentData),
+        messageLength: message.length
+    });
     
     // Add user message to chat
     addMessage(message, 'user');
@@ -614,20 +811,27 @@ async function sendMessage() {
 function addMessage(text, sender) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}-message`;
-    
+
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    
-    messageDiv.innerHTML = `
-        <div class="message-content">
-            <p>${text}</p>
-            <span class="message-time">${timeString}</span>
-        </div>
-    `;
-    
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const textParagraph = document.createElement('p');
+    textParagraph.textContent = text;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'message-time';
+    timeSpan.textContent = timeString;
+
+    contentDiv.appendChild(textParagraph);
+    contentDiv.appendChild(timeSpan);
+    messageDiv.appendChild(contentDiv);
+
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
     return messageDiv;
 }
 
@@ -668,6 +872,9 @@ Check your health at: ${window.location.href}`;
                     title: 'My Health Assessment',
                     text: shareText
                 });
+                trackEvent('results_shared', {
+                    method: 'native_share'
+                });
                 showNotification('Results shared successfully!', 'success');
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -682,6 +889,9 @@ Check your health at: ${window.location.href}`;
 
 function fallbackShare(text) {
     navigator.clipboard.writeText(text).then(() => {
+        trackEvent('results_shared', {
+            method: 'clipboard'
+        });
         showNotification('Results copied to clipboard!', 'success');
     }).catch(() => {
         showNotification('Unable to share results', 'error');
@@ -747,6 +957,22 @@ function sanitizeProfileId(rawId) {
 
 // Welcome message on page load
 window.addEventListener('load', () => {
+    trackEvent('page_view', {
+        path: window.location.pathname
+    });
+
+    initializeFormExperience();
+
+    const savedDraft = getFormDraft();
+    if (savedDraft) {
+        populateHealthForm(savedDraft);
+        trackEvent('form_draft_restored', {
+            restoredFields: Object.keys(savedDraft).length
+        });
+    } else {
+        updateFormProgress();
+    }
+
     const scoreGoalInput = document.getElementById('scoreGoalInput');
     if (scoreGoalInput) {
         scoreGoalInput.value = String(getSavedScoreGoal());
@@ -759,7 +985,7 @@ window.addEventListener('load', () => {
 
     renderHistorySection();
     setTimeout(() => {
-        showNotification('Welcome! Start your health assessment or chat with our AI assistant.', 'info');
+        showNotification('Welcome! Start your health assessment or chat with the health assistant.', 'info');
     }, 1000);
 });
 
@@ -798,6 +1024,9 @@ if (saveGoalBtn) {
 
         saveScoreGoal(goal);
         renderHistorySection();
+        trackEvent('goal_saved', {
+            goalTarget: goal
+        });
         showNotification('Goal saved.', 'success');
     });
 }
@@ -833,6 +1062,9 @@ if (syncSaveBtn) {
                 throw new Error(payload.error || 'Sync save failed');
             }
 
+            trackEvent('history_sync_saved', {
+                historyCount: getAssessmentHistory().length
+            });
             showNotification('Cloud sync saved successfully.', 'success');
         } catch (error) {
             console.error('Sync save failed:', error);
@@ -869,6 +1101,9 @@ if (syncLoadBtn) {
             }
 
             renderHistorySection();
+            trackEvent('history_sync_loaded', {
+                historyCount: Array.isArray(payload.history) ? payload.history.length : 0
+            });
             showNotification('Cloud data loaded.', 'success');
         } catch (error) {
             console.error('Sync load failed:', error);

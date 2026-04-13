@@ -1,13 +1,17 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs/promises');
+const { DatabaseSync } = require('node:sqlite');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static('public'));
 
+const SYNC_DB_FILE = path.join(__dirname, 'data', 'syncedHistory.db');
 const SYNC_DATA_FILE = path.join(__dirname, 'data', 'syncedHistory.json');
+let syncDb = null;
+const syncStoreReady = initializeSyncStore();
 
 function sanitizeProfileId(rawId) {
   return String(rawId || '')
@@ -16,18 +20,39 @@ function sanitizeProfileId(rawId) {
     .slice(0, 40);
 }
 
-async function ensureSyncDataFile() {
-  const dirPath = path.dirname(SYNC_DATA_FILE);
+async function ensureSyncDataDirectory() {
+  const dirPath = path.dirname(SYNC_DB_FILE);
   await fs.mkdir(dirPath, { recursive: true });
+}
+
+function normalizeHistoryEntry(entry) {
+  return {
+    id: String(entry.id || ''),
+    createdAt: String(entry.createdAt || ''),
+    overallScore: Number(entry.overallScore || 0),
+    status: String(entry.status || ''),
+    bmi: Number(entry.bmi || 0),
+    age: Number(entry.age || 0),
+    systolic: Number(entry.systolic || 0),
+    diastolic: Number(entry.diastolic || 0),
+    heartRate: Number(entry.heartRate || 0),
+    exerciseHours: Number(entry.exerciseHours || 0),
+    sleepHours: Number(entry.sleepHours || 0),
+    stressLevel: Number(entry.stressLevel || 0)
+  };
+}
+
+function normalizeGoalTarget(goalTarget) {
+  return Math.min(100, Math.max(1, Number(goalTarget || 85)));
+}
+
+async function readLegacySyncStore() {
+  await ensureSyncDataDirectory();
   try {
     await fs.access(SYNC_DATA_FILE);
   } catch {
-    await fs.writeFile(SYNC_DATA_FILE, JSON.stringify({}), 'utf8');
+    return {};
   }
-}
-
-async function readSyncStore() {
-  await ensureSyncDataFile();
   const raw = await fs.readFile(SYNC_DATA_FILE, 'utf8');
   if (!raw.trim()) return {};
   try {
@@ -38,12 +63,280 @@ async function readSyncStore() {
   }
 }
 
-async function writeSyncStore(store) {
-  await ensureSyncDataFile();
-  await fs.writeFile(SYNC_DATA_FILE, JSON.stringify(store, null, 2), 'utf8');
+async function migrateLegacySyncStore() {
+  const legacyStore = await readLegacySyncStore();
+  const legacyProfiles = Object.entries(legacyStore);
+
+  if (!legacyProfiles.length) {
+    return;
+  }
+
+  const insertProfile = syncDb.prepare(`
+    INSERT OR REPLACE INTO synced_profiles (
+      profile_id,
+      history_json,
+      goal_target,
+      updated_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+
+  for (const [profileId, profileData] of legacyProfiles) {
+    const normalizedHistory = Array.isArray(profileData.history)
+      ? profileData.history.map(normalizeHistoryEntry)
+      : [];
+
+    insertProfile.run(
+      profileId,
+      JSON.stringify(normalizedHistory),
+      normalizeGoalTarget(profileData.goalTarget),
+      String(profileData.updatedAt || new Date().toISOString())
+    );
+  }
+
+  let migratedFilePath = path.join(path.dirname(SYNC_DATA_FILE), 'syncedHistory.migrated.json');
+  try {
+    await fs.access(migratedFilePath);
+    migratedFilePath = path.join(
+      path.dirname(SYNC_DATA_FILE),
+      `syncedHistory.migrated-${Date.now()}.json`
+    );
+  } catch {
+    // Use the default migrated file name when it does not exist yet.
+  }
+
+  await fs.rename(SYNC_DATA_FILE, migratedFilePath);
 }
 
-// Health Assessment AI Algorithm
+async function initializeSyncStore() {
+  await ensureSyncDataDirectory();
+  syncDb = new DatabaseSync(SYNC_DB_FILE);
+
+  if (process.env.VERCEL) {
+    console.warn(
+      'SQLite sync storage is active, but Vercel filesystem storage is not durable across instances. Move sync data to a managed database for production use.'
+    );
+  }
+
+  syncDb.exec(`
+    CREATE TABLE IF NOT EXISTS synced_profiles (
+      profile_id TEXT PRIMARY KEY,
+      history_json TEXT NOT NULL,
+      goal_target INTEGER NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  syncDb.exec(`
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      event_name TEXT NOT NULL,
+      properties_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+
+  const row = syncDb.prepare('SELECT COUNT(*) AS count FROM synced_profiles').get();
+  if (Number(row.count) === 0) {
+    await migrateLegacySyncStore();
+  }
+}
+
+function saveSyncedProfile(profileId, history, goalTarget) {
+  const updatedAt = new Date().toISOString();
+  const statement = syncDb.prepare(`
+    INSERT INTO synced_profiles (
+      profile_id,
+      history_json,
+      goal_target,
+      updated_at
+    ) VALUES (?, ?, ?, ?)
+    ON CONFLICT(profile_id) DO UPDATE SET
+      history_json = excluded.history_json,
+      goal_target = excluded.goal_target,
+      updated_at = excluded.updated_at
+  `);
+
+  statement.run(
+    profileId,
+    JSON.stringify(history),
+    normalizeGoalTarget(goalTarget),
+    updatedAt
+  );
+
+  return updatedAt;
+}
+
+function getSyncedProfile(profileId) {
+  const row = syncDb.prepare(`
+    SELECT history_json, goal_target, updated_at
+    FROM synced_profiles
+    WHERE profile_id = ?
+  `).get(profileId);
+
+  if (!row) {
+    return null;
+  }
+
+  let history = [];
+  try {
+    const parsedHistory = JSON.parse(row.history_json);
+    history = Array.isArray(parsedHistory)
+      ? parsedHistory.map(normalizeHistoryEntry)
+      : [];
+  } catch {
+    history = [];
+  }
+
+  return {
+    history,
+    goalTarget: normalizeGoalTarget(row.goal_target),
+    updatedAt: String(row.updated_at || '')
+  };
+}
+
+function saveAnalyticsEvent(sessionId, eventName, properties) {
+  const createdAt = new Date().toISOString();
+  syncDb.prepare(`
+    INSERT INTO analytics_events (
+      session_id,
+      event_name,
+      properties_json,
+      created_at
+    ) VALUES (?, ?, ?, ?)
+  `).run(
+    String(sessionId || 'anonymous'),
+    String(eventName || 'unknown'),
+    JSON.stringify(properties || {}),
+    createdAt
+  );
+
+  return createdAt;
+}
+
+function roundRate(numerator, denominator) {
+  if (!denominator) {
+    return 0;
+  }
+
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function getAnalyticsSummary() {
+  const rows = syncDb.prepare(`
+    SELECT session_id, event_name, properties_json, created_at
+    FROM analytics_events
+    ORDER BY created_at DESC
+  `).all();
+
+  const eventCounts = {};
+  const uniqueSessions = new Set();
+  const scoreValues = [];
+  const dailyMap = new Map();
+  const today = new Date();
+
+  rows.forEach((row) => {
+    uniqueSessions.add(String(row.session_id));
+    eventCounts[row.event_name] = (eventCounts[row.event_name] || 0) + 1;
+
+    let properties = {};
+    try {
+      properties = JSON.parse(row.properties_json);
+    } catch {
+      properties = {};
+    }
+
+    if (
+      row.event_name === 'assessment_completed' &&
+      properties &&
+      typeof properties.overallScore === 'number'
+    ) {
+      scoreValues.push(properties.overallScore);
+    }
+
+    const dayKey = String(row.created_at).slice(0, 10);
+    const existingDay = dailyMap.get(dayKey) || {
+      date: dayKey,
+      pageViews: 0,
+      assessmentsCompleted: 0,
+      chatOpens: 0
+    };
+
+    if (row.event_name === 'page_view') {
+      existingDay.pageViews += 1;
+    }
+
+    if (row.event_name === 'assessment_completed') {
+      existingDay.assessmentsCompleted += 1;
+    }
+
+    if (row.event_name === 'chat_opened') {
+      existingDay.chatOpens += 1;
+    }
+
+    dailyMap.set(dayKey, existingDay);
+  });
+
+  const recentDaily = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const dayKey = date.toISOString().slice(0, 10);
+    recentDaily.push(
+      dailyMap.get(dayKey) || {
+        date: dayKey,
+        pageViews: 0,
+        assessmentsCompleted: 0,
+        chatOpens: 0
+      }
+    );
+  }
+
+  const pageViews = eventCounts.page_view || 0;
+  const formStarts = eventCounts.form_started || 0;
+  const assessmentsCompleted = eventCounts.assessment_completed || 0;
+  const chatOpens = eventCounts.chat_opened || 0;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    totals: {
+      totalEvents: rows.length,
+      uniqueSessions: uniqueSessions.size,
+      pageViews,
+      formStarts,
+      assessmentsCompleted,
+      chatOpens,
+      chatMessagesSent: eventCounts.chat_message_sent || 0,
+      resultsShared: eventCounts.results_shared || 0,
+      goalsSaved: eventCounts.goal_saved || 0,
+      historySyncSaves: eventCounts.history_sync_saved || 0,
+      historySyncLoads: eventCounts.history_sync_loaded || 0,
+      exampleDataUses: eventCounts.form_example_used || 0,
+      draftRestores: eventCounts.form_draft_restored || 0,
+      draftClears: eventCounts.form_draft_cleared || 0
+    },
+    conversion: {
+      formStartRate: roundRate(formStarts, pageViews),
+      assessmentCompletionRate: roundRate(assessmentsCompleted, pageViews),
+      assessmentFromStartRate: roundRate(assessmentsCompleted, formStarts),
+      chatOpenRate: roundRate(chatOpens, pageViews)
+    },
+    assessment: {
+      averageScore: scoreValues.length
+        ? Math.round(
+            (scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length) * 10
+          ) / 10
+        : null
+    },
+    recentDaily,
+    topEvents: Object.entries(eventCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([eventName, count]) => ({ eventName, count }))
+  };
+}
+
+// Health assessment scoring engine
 class HealthAssessmentAI {
   constructor() {
     // Weight factors for different health metrics
@@ -183,14 +476,14 @@ class HealthAssessmentAI {
 
 const healthAI = new HealthAssessmentAI();
 
-// AI Health Chat Agent Class
+// Rule-based health chat assistant
 class HealthChatAgent {
   constructor() {
     this.conversationHistory = [];
   }
 
   generateResponse(userMessage, healthContext) {
-    // Simple rule-based AI responses (can be replaced with actual AI API like OpenAI)
+    // Simple rule-based responses
     const message = userMessage.toLowerCase();
     
     // Check if user has health context
@@ -227,7 +520,7 @@ class HealthChatAgent {
     
     // General health questions
     if (message.includes('hello') || message.includes('hi')) {
-      return "Hello! I'm your AI Health Assistant. I can help you understand your health metrics, provide wellness advice, and answer your health-related questions. How can I assist you today?";
+      return "Hello! I'm your Health Assistant. I can help you understand your health metrics, provide general wellness guidance, and answer questions about your assessment results. How can I assist you today?";
     }
     
     if (message.includes('what can you do') || message.includes('help')) {
@@ -463,6 +756,7 @@ app.post('/api/assess', (req, res) => {
 
 app.post('/api/history/sync', async (req, res) => {
   try {
+    await syncStoreReady;
     const { profileId: rawProfileId, history, goalTarget } = req.body || {};
     const profileId = sanitizeProfileId(rawProfileId);
 
@@ -478,33 +772,11 @@ app.post('/api/history/sync', async (req, res) => {
       return res.status(400).json({ error: 'history cannot exceed 500 entries' });
     }
 
-    const normalizedHistory = history.map((entry) => ({
-      id: String(entry.id || ''),
-      createdAt: String(entry.createdAt || ''),
-      overallScore: Number(entry.overallScore || 0),
-      status: String(entry.status || ''),
-      bmi: Number(entry.bmi || 0),
-      age: Number(entry.age || 0),
-      systolic: Number(entry.systolic || 0),
-      diastolic: Number(entry.diastolic || 0),
-      heartRate: Number(entry.heartRate || 0),
-      exerciseHours: Number(entry.exerciseHours || 0),
-      sleepHours: Number(entry.sleepHours || 0),
-      stressLevel: Number(entry.stressLevel || 0)
-    }));
-
-    const safeGoal = Math.min(100, Math.max(1, Number(goalTarget || 85)));
-    const store = await readSyncStore();
-    store[profileId] = {
-      history: normalizedHistory,
-      goalTarget: safeGoal,
-      updatedAt: new Date().toISOString()
-    };
-
-    await writeSyncStore(store);
+    const normalizedHistory = history.map(normalizeHistoryEntry);
+    const updatedAt = saveSyncedProfile(profileId, normalizedHistory, goalTarget);
     return res.json({
       ok: true,
-      updatedAt: store[profileId].updatedAt,
+      updatedAt,
       records: normalizedHistory.length
     });
   } catch (error) {
@@ -515,14 +787,14 @@ app.post('/api/history/sync', async (req, res) => {
 
 app.get('/api/history/sync/:profileId', async (req, res) => {
   try {
+    await syncStoreReady;
     const profileId = sanitizeProfileId(req.params.profileId);
 
     if (!profileId) {
       return res.status(400).json({ error: 'Valid profileId is required' });
     }
 
-    const store = await readSyncStore();
-    const data = store[profileId];
+    const data = getSyncedProfile(profileId);
 
     if (!data) {
       return res.status(404).json({ error: 'No synced data found for this profileId' });
@@ -536,6 +808,42 @@ app.get('/api/history/sync/:profileId', async (req, res) => {
   } catch (error) {
     console.error('History sync load error:', error);
     return res.status(500).json({ error: 'Unable to load sync data' });
+  }
+});
+
+app.post('/api/analytics/event', async (req, res) => {
+  try {
+    await syncStoreReady;
+    const { sessionId, eventName, properties } = req.body || {};
+
+    if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 120) {
+      return res.status(400).json({ error: 'Valid sessionId is required' });
+    }
+
+    if (!eventName || typeof eventName !== 'string' || eventName.length > 80) {
+      return res.status(400).json({ error: 'Valid eventName is required' });
+    }
+
+    const safeProperties =
+      properties && typeof properties === 'object' && !Array.isArray(properties)
+        ? properties
+        : {};
+
+    const createdAt = saveAnalyticsEvent(sessionId, eventName, safeProperties);
+    return res.json({ ok: true, createdAt });
+  } catch (error) {
+    console.error('Analytics event error:', error);
+    return res.status(500).json({ error: 'Unable to save analytics event' });
+  }
+});
+
+app.get('/api/analytics/summary', async (req, res) => {
+  try {
+    await syncStoreReady;
+    return res.json(getAnalyticsSummary());
+  } catch (error) {
+    console.error('Analytics summary error:', error);
+    return res.status(500).json({ error: 'Unable to load analytics summary' });
   }
 });
 
