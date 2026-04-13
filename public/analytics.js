@@ -75,6 +75,68 @@ function renderSignals(summary) {
     });
 }
 
+function renderFunnel(summary) {
+    const container = document.getElementById('analyticsFunnel');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const steps = [
+        {
+            label: 'Page Views',
+            value: summary.totals.pageViews,
+            rate: summary.totals.pageViews ? 100 : 0,
+            helper: 'All tracked visits'
+        },
+        {
+            label: 'Form Starts',
+            value: summary.totals.formStarts,
+            rate: summary.conversion.formStartRate,
+            helper: 'Visitors who began the assessment'
+        },
+        {
+            label: 'Assessments Completed',
+            value: summary.totals.assessmentsCompleted,
+            rate: summary.conversion.assessmentCompletionRate,
+            helper: 'Visitors who finished the health check'
+        }
+    ];
+
+    steps.forEach((step) => {
+        const item = document.createElement('div');
+        item.className = 'analytics-funnel-step';
+
+        const topRow = document.createElement('div');
+        topRow.className = 'analytics-funnel-top';
+
+        const label = document.createElement('strong');
+        label.textContent = step.label;
+
+        const meta = document.createElement('span');
+        meta.textContent = `${step.value} · ${formatPercent(step.rate)}`;
+
+        topRow.appendChild(label);
+        topRow.appendChild(meta);
+
+        const track = document.createElement('div');
+        track.className = 'analytics-funnel-track';
+
+        const fill = document.createElement('div');
+        fill.className = 'analytics-funnel-fill';
+        fill.style.width = `${Math.max(0, Math.min(Number(step.rate || 0), 100))}%`;
+        track.appendChild(fill);
+
+        const helper = document.createElement('p');
+        helper.className = 'analytics-funnel-helper';
+        helper.textContent = step.helper;
+
+        item.appendChild(topRow);
+        item.appendChild(track);
+        item.appendChild(helper);
+        container.appendChild(item);
+    });
+}
+
 function renderTrendChart(recentDaily) {
     const canvas = document.getElementById('analyticsTrendChart');
     if (!canvas || typeof Chart === 'undefined') return;
@@ -166,6 +228,7 @@ async function loadAnalyticsSummary() {
 
         renderTopEvents(summary.topEvents || []);
         renderSignals(summary);
+        renderFunnel(summary);
         renderTrendChart(summary.recentDaily || []);
     } catch (error) {
         console.error(error);

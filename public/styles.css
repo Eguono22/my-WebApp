@@ -1392,6 +1392,11 @@ footer {
     gap: 12px;
 }
 
+.analytics-funnel {
+    display: grid;
+    gap: 16px;
+}
+
 .analytics-event-item,
 .analytics-signal-item {
     display: flex;
@@ -1406,6 +1411,42 @@ footer {
 
 .analytics-signal-item {
     justify-content: flex-start;
+}
+
+.analytics-funnel-step {
+    display: grid;
+    gap: 8px;
+}
+
+.analytics-funnel-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.analytics-funnel-top span {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.analytics-funnel-track {
+    height: 14px;
+    border-radius: 999px;
+    background: rgba(102, 126, 234, 0.12);
+    overflow: hidden;
+}
+
+.analytics-funnel-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #667eea 0%, #10b981 100%);
+}
+
+.analytics-funnel-helper {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
 }
 
 .analytics-empty-state {
