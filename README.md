@@ -97,7 +97,8 @@ The application uses a weighted scoring algorithm that:
 
 - The app records lightweight product events such as page views, completed assessments, chat opens, shared results, and sync actions.
 - Analytics events are stored locally in the same SQLite database so you can measure usage before integrating a third-party analytics platform.
-- Open `/analytics.html` locally to view the built-in analytics dashboard and key conversion metrics.
+- Set `ANALYTICS_ADMIN_PASSWORD` before starting the server to protect `/analytics.html` and `/api/analytics/summary`.
+- Open `/analytics.html` locally and sign in with username `admin` plus the password from `ANALYTICS_ADMIN_PASSWORD` to view the built-in analytics dashboard.
 - The dashboard now includes onboarding funnel signals such as form starts, example-data usage, draft restores, and start-to-complete conversion.
 
 ## License

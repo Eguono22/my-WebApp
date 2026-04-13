@@ -4,9 +4,7 @@ const fs = require('fs/promises');
 const { DatabaseSync } = require('node:sqlite');
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-app.use(express.json());
-app.use(express.static('public'));
+const ANALYTICS_ADMIN_USERNAME = 'admin';
 
 const SYNC_DB_FILE = path.join(__dirname, 'data', 'syncedHistory.db');
 const SYNC_DATA_FILE = path.join(__dirname, 'data', 'syncedHistory.json');
@@ -19,6 +17,69 @@ function sanitizeProfileId(rawId) {
     .replace(/[^a-zA-Z0-9_-]/g, '')
     .slice(0, 40);
 }
+
+function getAnalyticsAdminPassword() {
+  return String(process.env.ANALYTICS_ADMIN_PASSWORD || '').trim();
+}
+
+function sendAnalyticsAuthResponse(req, res, statusCode, message) {
+  if (String(req.originalUrl || '').startsWith('/api/')) {
+    return res.status(statusCode).json({ error: message });
+  }
+
+  return res.status(statusCode).send(message);
+}
+
+function requireAnalyticsAuth(req, res, next) {
+  const configuredPassword = getAnalyticsAdminPassword();
+
+  if (!configuredPassword) {
+    return sendAnalyticsAuthResponse(
+      req,
+      res,
+      503,
+      'Analytics dashboard is not configured. Set ANALYTICS_ADMIN_PASSWORD first.'
+    );
+  }
+
+  const authorization = String(req.headers.authorization || '');
+  if (!authorization.startsWith('Basic ')) {
+    res.set('WWW-Authenticate', 'Basic realm="Analytics Dashboard"');
+    return sendAnalyticsAuthResponse(req, res, 401, 'Analytics dashboard authentication required.');
+  }
+
+  let decodedCredentials = '';
+  try {
+    decodedCredentials = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
+  } catch {
+    res.set('WWW-Authenticate', 'Basic realm="Analytics Dashboard"');
+    return sendAnalyticsAuthResponse(req, res, 401, 'Invalid analytics dashboard credentials.');
+  }
+
+  const separatorIndex = decodedCredentials.indexOf(':');
+  const username = separatorIndex >= 0 ? decodedCredentials.slice(0, separatorIndex) : '';
+  const password = separatorIndex >= 0 ? decodedCredentials.slice(separatorIndex + 1) : '';
+
+  if (username !== ANALYTICS_ADMIN_USERNAME || password !== configuredPassword) {
+    res.set('WWW-Authenticate', 'Basic realm="Analytics Dashboard"');
+    return sendAnalyticsAuthResponse(req, res, 401, 'Invalid analytics dashboard credentials.');
+  }
+
+  return next();
+}
+
+app.use(express.json());
+app.use(['/analytics', '/analytics.html', '/api/analytics/summary'], requireAnalyticsAuth);
+
+app.get('/analytics', (req, res) => {
+  res.redirect('/analytics.html');
+});
+
+app.get('/analytics.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'analytics.html'));
+});
+
+app.use(express.static('public'));
 
 async function ensureSyncDataDirectory() {
   const dirPath = path.dirname(SYNC_DB_FILE);

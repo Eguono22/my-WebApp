@@ -1,9 +1,16 @@
 const assert = require('node:assert/strict');
 const PORT = Number(process.env.SMOKE_TEST_PORT || 3100);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
+const ANALYTICS_ADMIN_PASSWORD = 'smoke-test-password';
 
-async function fetchText(url) {
-    const response = await fetch(url);
+function createAnalyticsAuthHeaders() {
+    return {
+        Authorization: `Basic ${Buffer.from(`admin:${ANALYTICS_ADMIN_PASSWORD}`).toString('base64')}`
+    };
+}
+
+async function fetchText(url, options) {
+    const response = await fetch(url, options);
     const text = await response.text();
     return { response, text };
 }
@@ -14,7 +21,11 @@ async function fetchJson(url, options) {
     let json = null;
 
     if (text) {
-        json = JSON.parse(text);
+        try {
+            json = JSON.parse(text);
+        } catch {
+            json = null;
+        }
     }
 
     return { response, json, text };
@@ -22,6 +33,7 @@ async function fetchJson(url, options) {
 
 async function run() {
     process.env.NODE_ENV = 'production';
+    process.env.ANALYTICS_ADMIN_PASSWORD = ANALYTICS_ADMIN_PASSWORD;
     const app = require('../server');
     const server = app.listen(PORT);
 
@@ -30,7 +42,18 @@ async function run() {
         assert.equal(home.response.status, 200, 'Home page should return 200.');
         assert.match(home.text, /id="healthForm"/, 'Home page should render the health form.');
 
-        const analyticsPage = await fetchText(`${BASE_URL}/analytics.html`);
+        const blockedAnalyticsPage = await fetchText(`${BASE_URL}/analytics.html`, {
+            redirect: 'manual'
+        });
+        assert.equal(
+            blockedAnalyticsPage.response.status,
+            401,
+            'Analytics page should require authentication.'
+        );
+
+        const analyticsPage = await fetchText(`${BASE_URL}/analytics.html`, {
+            headers: createAnalyticsAuthHeaders()
+        });
         assert.equal(analyticsPage.response.status, 200, 'Analytics page should return 200.');
         assert.match(
             analyticsPage.text,
@@ -38,7 +61,16 @@ async function run() {
             'Analytics page should render the trend chart canvas.'
         );
 
-        const beforeSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`);
+        const blockedSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`);
+        assert.equal(
+            blockedSummary.response.status,
+            401,
+            'Analytics summary endpoint should require authentication.'
+        );
+
+        const beforeSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`, {
+            headers: createAnalyticsAuthHeaders()
+        });
         assert.equal(
             beforeSummary.response.status,
             200,
@@ -141,7 +173,9 @@ async function run() {
         assert.equal(syncLoad.response.status, 200, 'History sync load should return 200.');
         assert.equal(syncLoad.json?.history?.length, 1, 'History sync load should return one record.');
 
-        const afterSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`);
+        const afterSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`, {
+            headers: createAnalyticsAuthHeaders()
+        });
         assert.equal(
             afterSummary.response.status,
             200,

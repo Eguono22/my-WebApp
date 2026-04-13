@@ -12,6 +12,10 @@
   ],
   "routes": [
     {
+      "src": "/analytics(?:\\.html)?/?",
+      "dest": "server.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "server.js"
     },
