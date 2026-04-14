@@ -90,8 +90,9 @@ The application uses a weighted scoring algorithm that:
 ## Data Handling
 
 - Assessment history is stored in the browser for progress tracking.
-- If a user chooses to use the sync feature, history and goal data are stored server-side in a SQLite database and linked to a Profile ID.
-- For Vercel or other serverless production hosting, move sync storage to a managed database because local SQLite files are not durable across instances.
+- If a user chooses to use the sync feature, history and goal data are stored server-side and linked to a Profile ID.
+- The app supports `DATABASE_URL` for managed Postgres storage in production and falls back to local SQLite when `DATABASE_URL` is not set.
+- For Vercel production, connect a managed Postgres database so sync and analytics data remain durable across deployments and instances.
 
 ## Analytics
 
