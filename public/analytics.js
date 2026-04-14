@@ -22,6 +22,14 @@ function setText(id, value) {
     }
 }
 
+function setRestoreStatus(message, isError = false) {
+    const element = document.getElementById('analyticsRestoreStatus');
+    if (!element) return;
+
+    element.textContent = message;
+    element.classList.toggle('is-error', isError);
+}
+
 function renderTopEvents(events) {
     const list = document.getElementById('topEventsList');
     if (!list) return;
@@ -236,4 +244,60 @@ async function loadAnalyticsSummary() {
     }
 }
 
-window.addEventListener('load', loadAnalyticsSummary);
+function initializeRestoreAction() {
+    const input = document.getElementById('analyticsRestoreInput');
+    if (!input) return;
+
+    input.addEventListener('change', async () => {
+        const [file] = input.files || [];
+        if (!file) {
+            return;
+        }
+
+        try {
+            const fileContents = await file.text();
+            const payload = JSON.parse(fileContents);
+            const profileCount = Array.isArray(payload.syncedProfiles) ? payload.syncedProfiles.length : 0;
+            const eventCount = Array.isArray(payload.analyticsEvents) ? payload.analyticsEvents.length : 0;
+
+            const confirmed = window.confirm(
+                `Restore ${profileCount} synced profiles and ${eventCount} analytics events? This replaces the current admin data.`
+            );
+
+            if (!confirmed) {
+                setRestoreStatus('Restore canceled.');
+                return;
+            }
+
+            setRestoreStatus('Restoring data...');
+
+            const response = await fetch('/api/admin/restore', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error('Restore failed');
+            }
+
+            const result = await response.json();
+            setRestoreStatus(
+                `Restore complete: ${result.restoredProfiles} profiles and ${result.restoredAnalyticsEvents} events loaded.`
+            );
+            await loadAnalyticsSummary();
+        } catch (error) {
+            console.error(error);
+            setRestoreStatus('Restore failed. Check that the JSON file came from the admin export.', true);
+        } finally {
+            input.value = '';
+        }
+    });
+}
+
+window.addEventListener('load', () => {
+    initializeRestoreAction();
+    loadAnalyticsSummary();
+});

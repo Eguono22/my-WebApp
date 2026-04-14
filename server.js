@@ -63,9 +63,9 @@ function requireAnalyticsAuth(req, res, next) {
   return next();
 }
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(
-  ['/analytics', '/analytics.html', '/api/analytics/summary', '/api/admin/export'],
+  ['/analytics', '/analytics.html', '/api/analytics/summary', '/api/admin/export', '/api/admin/restore'],
   requireAnalyticsAuth
 );
 
@@ -124,6 +124,11 @@ async function getAnalyticsSummary() {
 async function exportAdminData() {
   const storage = await storageReady;
   return storage.exportAdminData();
+}
+
+async function restoreAdminData(payload) {
+  const storage = await storageReady;
+  return storage.restoreAdminData(payload);
 }
 
 // Health assessment scoring engine
@@ -648,6 +653,26 @@ app.get('/api/admin/export', async (req, res) => {
   } catch (error) {
     console.error('Admin export error:', error);
     return res.status(500).json({ error: 'Unable to export admin data' });
+  }
+});
+
+app.post('/api/admin/restore', async (req, res) => {
+  try {
+    const payload = req.body;
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return res.status(400).json({ error: 'A valid export payload is required.' });
+    }
+
+    const restoreResult = await restoreAdminData(payload);
+    return res.status(200).json({
+      ok: true,
+      restoredProfiles: restoreResult.restoredProfiles,
+      restoredAnalyticsEvents: restoreResult.restoredAnalyticsEvents
+    });
+  } catch (error) {
+    console.error('Admin restore error:', error);
+    return res.status(500).json({ error: 'Unable to restore admin data' });
   }
 });
 

@@ -101,6 +101,7 @@ The application uses a weighted scoring algorithm that:
 - Set `ANALYTICS_ADMIN_PASSWORD` before starting the server to protect `/analytics.html` and `/api/analytics/summary`.
 - Open `/analytics.html` locally and sign in with username `admin` plus the password from `ANALYTICS_ADMIN_PASSWORD` to view the built-in analytics dashboard.
 - Use the `Export JSON` action in the analytics dashboard or request `/api/admin/export` with admin auth to download analytics summary and synced profile data.
+- Use the `Restore JSON` action in the analytics dashboard or send a protected `POST` request to `/api/admin/restore` with a previous export payload to replace admin data from backup.
 - The dashboard now includes onboarding funnel signals such as form starts, example-data usage, draft restores, and start-to-complete conversion.
 
 ## License

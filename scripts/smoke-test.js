@@ -185,7 +185,30 @@ async function run() {
         });
         assert.equal(exportResponse.response.status, 200, 'Admin export endpoint should return 200.');
         assert.equal(exportResponse.json?.analyticsSummary?.totals?.pageViews >= 1, true, 'Export should include analytics summary data.');
+        assert.equal(Array.isArray(exportResponse.json?.analyticsEvents), true, 'Export should include raw analytics events.');
         assert.equal(Array.isArray(exportResponse.json?.syncedProfiles), true, 'Export should include synced profiles.');
+
+        const blockedRestore = await fetchJson(`${BASE_URL}/api/admin/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(exportResponse.json)
+        });
+        assert.equal(
+            blockedRestore.response.status,
+            401,
+            'Admin restore endpoint should require authentication.'
+        );
+
+        const restoreResponse = await fetchJson(`${BASE_URL}/api/admin/restore`, {
+            method: 'POST',
+            headers: {
+                ...createAnalyticsAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(exportResponse.json)
+        });
+        assert.equal(restoreResponse.response.status, 200, 'Admin restore endpoint should return 200.');
+        assert.equal(restoreResponse.json?.ok, true, 'Admin restore should confirm success.');
 
         const afterSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`, {
             headers: createAnalyticsAuthHeaders()
