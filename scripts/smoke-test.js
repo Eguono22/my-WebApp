@@ -173,6 +173,20 @@ async function run() {
         assert.equal(syncLoad.response.status, 200, 'History sync load should return 200.');
         assert.equal(syncLoad.json?.history?.length, 1, 'History sync load should return one record.');
 
+        const blockedExport = await fetchJson(`${BASE_URL}/api/admin/export`);
+        assert.equal(
+            blockedExport.response.status,
+            401,
+            'Admin export endpoint should require authentication.'
+        );
+
+        const exportResponse = await fetchJson(`${BASE_URL}/api/admin/export`, {
+            headers: createAnalyticsAuthHeaders()
+        });
+        assert.equal(exportResponse.response.status, 200, 'Admin export endpoint should return 200.');
+        assert.equal(exportResponse.json?.analyticsSummary?.totals?.pageViews >= 1, true, 'Export should include analytics summary data.');
+        assert.equal(Array.isArray(exportResponse.json?.syncedProfiles), true, 'Export should include synced profiles.');
+
         const afterSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`, {
             headers: createAnalyticsAuthHeaders()
         });

@@ -64,7 +64,10 @@ function requireAnalyticsAuth(req, res, next) {
 }
 
 app.use(express.json());
-app.use(['/analytics', '/analytics.html', '/api/analytics/summary'], requireAnalyticsAuth);
+app.use(
+  ['/analytics', '/analytics.html', '/api/analytics/summary', '/api/admin/export'],
+  requireAnalyticsAuth
+);
 
 app.get('/analytics', (req, res) => {
   res.redirect('/analytics.html');
@@ -116,6 +119,11 @@ async function saveAnalyticsEvent(sessionId, eventName, properties) {
 async function getAnalyticsSummary() {
   const storage = await storageReady;
   return storage.getAnalyticsSummary();
+}
+
+async function exportAdminData() {
+  const storage = await storageReady;
+  return storage.exportAdminData();
 }
 
 // Health assessment scoring engine
@@ -622,6 +630,24 @@ app.get('/api/analytics/summary', async (req, res) => {
   } catch (error) {
     console.error('Analytics summary error:', error);
     return res.status(500).json({ error: 'Unable to load analytics summary' });
+  }
+});
+
+app.get('/api/admin/export', async (req, res) => {
+  try {
+    const exportPayload = await exportAdminData();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=\"health-assessment-admin-export-${timestamp}.json\"`
+    );
+
+    return res.status(200).send(JSON.stringify(exportPayload, null, 2));
+  } catch (error) {
+    console.error('Admin export error:', error);
+    return res.status(500).json({ error: 'Unable to export admin data' });
   }
 });
 
