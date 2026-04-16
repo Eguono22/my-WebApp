@@ -305,11 +305,11 @@
 
                 <div class="history-chart-card">
                     <h3>
-                        <i class="fas fa-chart-line"></i>
-                        Overall Health Score Trend
+                        <i class="fas fa-chart-column"></i>
+                        Overall Health Score Frequency
                     </h3>
                     <div class="history-controls">
-                        <label for="historyMetricSelect">Trend Metric</label>
+                        <label for="historyMetricSelect">Metric</label>
                         <select id="historyMetricSelect">
                             <option value="overallScore">Overall Score</option>
                             <option value="bmi">BMI</option>
@@ -321,7 +321,9 @@
                             <option value="diastolic">Diastolic BP (mmHg)</option>
                         </select>
                     </div>
-                    <canvas id="historyTrendChart" height="120"></canvas>
+                    <div class="chart-frame history-chart-frame">
+                        <canvas id="historyTrendChart" height="120"></canvas>
+                    </div>
                 </div>
 
                 <div class="history-sync-card">

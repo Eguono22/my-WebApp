@@ -63,69 +63,123 @@ async function trackEvent(eventName, properties = {}) {
 const HISTORY_METRICS = {
     overallScore: {
         label: 'Overall Score',
-        chartTitle: 'Overall Health Score Trend',
+        chartTitle: 'Overall Health Score Frequency',
         color: '#667eea',
         min: 0,
         max: 100,
-        stepSize: 20
+        stepSize: 20,
+        binSize: 10,
+        precision: 0
     },
     bmi: {
         label: 'BMI',
-        chartTitle: 'BMI Trend',
+        chartTitle: 'BMI Frequency',
         color: '#f97316',
         min: 10,
         max: 45,
-        stepSize: 5
+        stepSize: 5,
+        binSize: 2.5,
+        precision: 1
     },
     sleepHours: {
         label: 'Sleep (hours/night)',
-        chartTitle: 'Sleep Trend',
+        chartTitle: 'Sleep Frequency',
         color: '#06b6d4',
         min: 0,
         max: 12,
-        stepSize: 2
+        stepSize: 2,
+        binSize: 1,
+        precision: 0
     },
     exerciseHours: {
         label: 'Exercise (hours/week)',
-        chartTitle: 'Exercise Trend',
+        chartTitle: 'Exercise Frequency',
         color: '#22c55e',
         min: 0,
         max: 12,
-        stepSize: 2
+        stepSize: 2,
+        binSize: 1,
+        precision: 0
     },
     stressLevel: {
         label: 'Stress Level',
-        chartTitle: 'Stress Trend',
+        chartTitle: 'Stress Level Frequency',
         color: '#ef4444',
         min: 1,
         max: 5,
-        stepSize: 1
+        stepSize: 1,
+        binSize: 1,
+        precision: 0
     },
     heartRate: {
         label: 'Heart Rate (bpm)',
-        chartTitle: 'Heart Rate Trend',
+        chartTitle: 'Heart Rate Frequency',
         color: '#ec4899',
         min: 40,
         max: 120,
-        stepSize: 10
+        stepSize: 10,
+        binSize: 10,
+        precision: 0
     },
     systolic: {
         label: 'Systolic BP (mmHg)',
-        chartTitle: 'Systolic Blood Pressure Trend',
+        chartTitle: 'Systolic Blood Pressure Frequency',
         color: '#8b5cf6',
         min: 70,
         max: 180,
-        stepSize: 10
+        stepSize: 10,
+        binSize: 10,
+        precision: 0
     },
     diastolic: {
         label: 'Diastolic BP (mmHg)',
-        chartTitle: 'Diastolic Blood Pressure Trend',
+        chartTitle: 'Diastolic Blood Pressure Frequency',
         color: '#a855f7',
         min: 40,
         max: 120,
-        stepSize: 10
+        stepSize: 10,
+        binSize: 10,
+        precision: 0
     }
 };
+
+function formatFrequencyEdge(value, precision = 0) {
+    return Number(value.toFixed(precision)).toString();
+}
+
+function buildFrequencyDistribution(history, metricConfig) {
+    const values = history
+        .map((entry) => entry[selectedHistoryMetric])
+        .filter((value) => typeof value === 'number' && Number.isFinite(value));
+
+    const labels = [];
+    const counts = [];
+    const binSize = metricConfig.binSize || metricConfig.stepSize || 1;
+    const precision = metricConfig.precision || 0;
+
+    for (let start = metricConfig.min; start < metricConfig.max; start += binSize) {
+        const end = Math.min(metricConfig.max, start + binSize);
+        labels.push(
+            `${formatFrequencyEdge(start, precision)}-${formatFrequencyEdge(end, precision)}`
+        );
+        counts.push(0);
+    }
+
+    values.forEach((value) => {
+        const clampedValue = Math.max(metricConfig.min, Math.min(metricConfig.max, value));
+        let index = Math.floor((clampedValue - metricConfig.min) / binSize);
+
+        if (index >= counts.length) {
+            index = counts.length - 1;
+        }
+
+        if (index >= 0) {
+            counts[index] += 1;
+        }
+    });
+
+    return { labels, counts };
+}
 
 function getFormDraft() {
     try {
@@ -679,20 +733,11 @@ function renderTrendChart(history) {
     const canvas = document.getElementById('historyTrendChart');
     if (!canvas || typeof Chart === 'undefined') return;
     const metricConfig = HISTORY_METRICS[selectedHistoryMetric] || HISTORY_METRICS.overallScore;
-
-    const labels = history.map((entry) => {
-        const date = new Date(entry.createdAt);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    });
-
-    const metricData = history.map((entry) => {
-        const value = entry[selectedHistoryMetric];
-        return typeof value === 'number' ? value : null;
-    });
+    const { labels, counts } = buildFrequencyDistribution(history, metricConfig);
 
     const trendTitle = document.querySelector('.history-chart-card h3');
     if (trendTitle) {
-        trendTitle.innerHTML = `<i class="fas fa-chart-line"></i>${metricConfig.chartTitle}`;
+        trendTitle.innerHTML = `<i class="fas fa-chart-column"></i> ${metricConfig.chartTitle}`;
     }
 
     if (trendChart) {
@@ -700,19 +745,19 @@ function renderTrendChart(history) {
     }
 
     trendChart = new Chart(canvas, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels,
             datasets: [
                 {
-                    label: metricConfig.label,
-                    data: metricData,
+                    label: 'Assessments',
+                    data: counts,
                     borderColor: metricConfig.color,
-                    backgroundColor: `${metricConfig.color}33`,
-                    fill: true,
-                    tension: 0.35,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    backgroundColor: `${metricConfig.color}b3`,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    hoverBackgroundColor: metricConfig.color,
+                    maxBarThickness: 42
                 }
             ]
         },
@@ -722,13 +767,36 @@ function renderTrendChart(history) {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title(items) {
+                            return `${metricConfig.label}: ${items[0].label}`;
+                        },
+                        label(context) {
+                            const count = context.parsed.y;
+                            return `${count} assessment${count === 1 ? '' : 's'}`;
+                        }
+                    }
                 }
             },
             scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: false
+                    }
+                },
                 y: {
-                    min: metricConfig.min,
-                    max: metricConfig.max,
-                    ticks: { stepSize: metricConfig.stepSize }
+                    beginAtZero: true,
+                    suggestedMax: Math.max(2, ...counts) + 1,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
                 }
             }
         }

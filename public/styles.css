@@ -882,9 +882,22 @@ header h1 {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
 }
 
-#historyTrendChart {
+.chart-frame {
+    position: relative;
     width: 100%;
-    min-height: 280px;
+    overflow: hidden;
+}
+
+.history-chart-frame,
+.analytics-chart-frame {
+    height: clamp(220px, 26vw, 300px);
+}
+
+#historyTrendChart {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0;
 }
 
 #historyList {
@@ -1427,8 +1440,10 @@ footer {
 }
 
 #analyticsTrendChart {
-    width: 100%;
-    min-height: 280px;
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0;
 }
 
 .analytics-event-list,
