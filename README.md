@@ -48,6 +48,20 @@ http://localhost:3000
 
 4. Click "Assess My Health" to receive your comprehensive health assessment
 
+## Environment Variables
+
+Create a local `.env.local` file for development or set these values in Vercel:
+
+```bash
+ANALYTICS_ADMIN_PASSWORD=choose-a-strong-password
+DATABASE_URL=postgres://...
+```
+
+- `ANALYTICS_ADMIN_PASSWORD`: Required to access `/analytics.html`, `/api/analytics/summary`, and admin export/restore endpoints
+- `DATABASE_URL`: Recommended for durable production storage; if omitted locally, the app falls back to SQLite in `data/syncedHistory.db`
+
+See `.env.example` for the tracked template.
+
 ## Health Metrics Evaluated
 
 The system evaluates the following health metrics with weighted importance:
@@ -93,6 +107,22 @@ The application uses a weighted scoring algorithm that:
 - If a user chooses to use the sync feature, history and goal data are stored server-side and linked to a Profile ID.
 - The app supports `DATABASE_URL` for managed Postgres storage in production and falls back to local SQLite when `DATABASE_URL` is not set.
 - For Vercel production, connect a managed Postgres database so sync and analytics data remain durable across deployments and instances.
+
+## Deploying To Vercel
+
+1. Install the Vercel CLI if it is not already available: `npm install -g vercel`
+2. Link the repo to your Vercel project: `vercel link --yes`
+3. Add the required environment variables:
+   `vercel env add ANALYTICS_ADMIN_PASSWORD production preview development`
+   `vercel env add DATABASE_URL production preview development`
+4. Pull the variables locally when needed: `vercel env pull .env.local --yes`
+5. Deploy: `vercel --prod`
+
+After deployment, verify:
+
+- `/api/health` returns `ok: true`
+- `/analytics.html` prompts for Basic Auth and loads with `admin` plus `ANALYTICS_ADMIN_PASSWORD`
+- sync save/load and admin export/restore work against Postgres-backed storage
 
 ## Analytics
 

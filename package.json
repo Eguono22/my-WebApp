@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Intelligent computer systems application to assess human health",
   "main": "server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",

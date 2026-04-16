@@ -42,6 +42,11 @@ async function run() {
         assert.equal(home.response.status, 200, 'Home page should return 200.');
         assert.match(home.text, /id="healthForm"/, 'Home page should render the health form.');
 
+        const health = await fetchJson(`${BASE_URL}/api/health`);
+        assert.equal(health.response.status, 200, 'Health endpoint should return 200.');
+        assert.equal(health.json?.ok, true, 'Health endpoint should report ok.');
+        assert.equal(typeof health.json?.storage, 'string', 'Health endpoint should report storage type.');
+
         const blockedAnalyticsPage = await fetchText(`${BASE_URL}/analytics.html`, {
             redirect: 'manual'
         });

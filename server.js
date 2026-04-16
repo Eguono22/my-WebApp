@@ -5,12 +5,22 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ANALYTICS_ADMIN_USERNAME = 'admin';
 const storageReady = createStorage();
+const MAX_CHAT_MESSAGE_LENGTH = 1000;
+const MAX_ANALYTICS_PROPERTIES_LENGTH = 5000;
+const ALLOWED_ANALYTICS_EVENT_NAME = /^[a-z0-9_]{1,80}$/;
+
+app.disable('x-powered-by');
+app.set('trust proxy', true);
 
 function sanitizeProfileId(rawId) {
   return String(rawId || '')
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, '')
     .slice(0, 40);
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function getAnalyticsAdminPassword() {
@@ -64,6 +74,11 @@ function requireAnalyticsAuth(req, res, next) {
 }
 
 app.use(express.json({ limit: '5mb' }));
+app.use((req, res, next) => {
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 app.use(
   ['/analytics', '/analytics.html', '/api/analytics/summary', '/api/admin/export', '/api/admin/restore'],
   requireAnalyticsAuth
@@ -78,6 +93,20 @@ app.get('/analytics.html', (req, res) => {
 });
 
 app.use(express.static('public'));
+
+app.get('/api/health', async (req, res) => {
+  try {
+    const storage = await storageReady;
+    return res.json({
+      ok: true,
+      storage: storage.label || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    return res.status(500).json({ ok: false, error: 'Storage initialization failed' });
+  }
+});
 
 function normalizeHistoryEntry(entry) {
   return {
@@ -479,14 +508,20 @@ const chatAgent = new HealthChatAgent();
 // API endpoint for AI chat
 app.post('/api/chat', (req, res) => {
   try {
-    const { message, context } = req.body;
-    
-    if (!message) {
+    const { message, context } = req.body || {};
+    const trimmedMessage = String(message || '').trim();
+
+    if (!trimmedMessage) {
       return res.status(400).json({ error: 'Message is required' });
     }
-    
-    const response = chatAgent.generateResponse(message, context);
-    
+
+    if (trimmedMessage.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: 'Message cannot exceed 1000 characters' });
+    }
+
+    const safeContext = isPlainObject(context) ? context : {};
+    const response = chatAgent.generateResponse(trimmedMessage, safeContext);
+
     res.json({ response });
   } catch (error) {
     console.error('Chat error:', error);
@@ -566,6 +601,10 @@ app.post('/api/history/sync', async (req, res) => {
       return res.status(400).json({ error: 'history cannot exceed 500 entries' });
     }
 
+    if (!history.every(isPlainObject)) {
+      return res.status(400).json({ error: 'Each history entry must be an object' });
+    }
+
     const normalizedHistory = history.map(normalizeHistoryEntry);
     const updatedAt = await saveSyncedProfile(profileId, normalizedHistory, goalTarget);
     return res.json({
@@ -612,14 +651,19 @@ app.post('/api/analytics/event', async (req, res) => {
       return res.status(400).json({ error: 'Valid sessionId is required' });
     }
 
-    if (!eventName || typeof eventName !== 'string' || eventName.length > 80) {
-      return res.status(400).json({ error: 'Valid eventName is required' });
+    if (
+      !eventName ||
+      typeof eventName !== 'string' ||
+      !ALLOWED_ANALYTICS_EVENT_NAME.test(eventName)
+    ) {
+      return res.status(400).json({ error: 'Valid snake_case eventName is required' });
     }
 
-    const safeProperties =
-      properties && typeof properties === 'object' && !Array.isArray(properties)
-        ? properties
-        : {};
+    const safeProperties = isPlainObject(properties) ? properties : {};
+
+    if (JSON.stringify(safeProperties).length > MAX_ANALYTICS_PROPERTIES_LENGTH) {
+      return res.status(400).json({ error: 'Analytics properties payload is too large' });
+    }
 
     const createdAt = await saveAnalyticsEvent(sessionId, eventName, safeProperties);
     return res.json({ ok: true, createdAt });
