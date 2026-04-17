@@ -12,6 +12,10 @@
   ],
   "routes": [
     {
+      "src": "/favicon\\.ico",
+      "dest": "public/favicon.svg"
+    },
+    {
       "src": "/analytics(?:\\.html)?/?",
       "dest": "server.js"
     },

@@ -14,6 +14,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Health Assessment Hub">
     <meta name="twitter:description" content="Review your wellness metrics, track progress over time, and get practical health guidance.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -321,7 +322,13 @@
                             <option value="diastolic">Diastolic BP (mmHg)</option>
                         </select>
                     </div>
+                    <p id="historyChartHelp" class="history-chart-help">
+                        Bars show how many saved assessments fall into each value range.
+                    </p>
                     <div class="chart-frame history-chart-frame">
+                        <div id="historyChartEmpty" class="history-chart-empty" hidden>
+                            Save an assessment to start building this frequency view.
+                        </div>
                         <canvas id="historyTrendChart" height="120"></canvas>
                     </div>
                 </div>

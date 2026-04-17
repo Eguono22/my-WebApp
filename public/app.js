@@ -178,7 +178,7 @@ function buildFrequencyDistribution(history, metricConfig) {
         }
     });
 
-    return { labels, counts };
+    return { labels, counts, valueCount: values.length };
 }
 
 function getFormDraft() {
@@ -733,11 +733,25 @@ function renderTrendChart(history) {
     const canvas = document.getElementById('historyTrendChart');
     if (!canvas || typeof Chart === 'undefined') return;
     const metricConfig = HISTORY_METRICS[selectedHistoryMetric] || HISTORY_METRICS.overallScore;
-    const { labels, counts } = buildFrequencyDistribution(history, metricConfig);
+    const chartHelp = document.getElementById('historyChartHelp');
+    const chartEmpty = document.getElementById('historyChartEmpty');
+    const { labels, counts, valueCount } = buildFrequencyDistribution(history, metricConfig);
 
     const trendTitle = document.querySelector('.history-chart-card h3');
     if (trendTitle) {
         trendTitle.innerHTML = `<i class="fas fa-chart-column"></i> ${metricConfig.chartTitle}`;
+    }
+
+    if (chartHelp) {
+        if (valueCount <= 1) {
+            chartHelp.textContent = `Only ${valueCount === 1 ? 'one assessment is' : 'no assessments are'} saved for ${metricConfig.label.toLowerCase()} so far, so this view will become more useful as you add more check-ins.`;
+        } else {
+            chartHelp.textContent = 'Bars show how many saved assessments fall into each value range.';
+        }
+    }
+
+    if (chartEmpty) {
+        chartEmpty.hidden = valueCount > 0;
     }
 
     if (trendChart) {
