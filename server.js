@@ -92,6 +92,11 @@ app.get('/analytics.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'analytics.html'));
 });
 
+app.get('/favicon.ico', (req, res) => {
+  res.type('image/svg+xml');
+  res.sendFile(path.join(__dirname, 'public', 'favicon.svg'));
+});
+
 app.use(express.static('public'));
 
 app.get('/api/health', async (req, res) => {

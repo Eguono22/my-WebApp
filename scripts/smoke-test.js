@@ -41,6 +41,29 @@ async function run() {
         const home = await fetchText(`${BASE_URL}/`);
         assert.equal(home.response.status, 200, 'Home page should return 200.');
         assert.match(home.text, /id="healthForm"/, 'Home page should render the health form.');
+        assert.match(
+            home.text,
+            /id="historyTrendChart"/,
+            'Home page should include the history chart canvas.'
+        );
+        assert.match(
+            home.text,
+            /id="historyChartHelp"/,
+            'Home page should include the history chart helper copy.'
+        );
+        assert.match(
+            home.text,
+            /id="historyChartEmpty"/,
+            'Home page should include the history chart empty state.'
+        );
+
+        const favicon = await fetchText(`${BASE_URL}/favicon.ico`);
+        assert.equal(favicon.response.status, 200, 'Favicon route should return 200.');
+        assert.match(
+            favicon.response.headers.get('content-type') || '',
+            /image\/svg\+xml/,
+            'Favicon route should serve the SVG asset.'
+        );
 
         const health = await fetchJson(`${BASE_URL}/api/health`);
         assert.equal(health.response.status, 200, 'Health endpoint should return 200.');
