@@ -1,0 +1,44 @@
+name: Production Check
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PRODUCTION_URL: https://healthassessmenthub.com
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify home page
+        run: |
+          curl --fail --silent --show-error "$PRODUCTION_URL/" --output home.html
+          grep 'id="healthForm"' home.html
+
+      - name: Verify production health endpoint
+        run: |
+          curl --fail --silent --show-error "$PRODUCTION_URL/api/health" --output health.json
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('health.json','utf8')); if (!data.ok) throw new Error('Health endpoint did not return ok=true.'); if (data.storage !== 'postgres') throw new Error('Expected postgres storage in production.');"
+
+      - name: Verify analytics page requires authentication
+        run: |
+          status_code=$(curl --silent --show-error --output analytics.html --write-out "%{http_code}" "$PRODUCTION_URL/analytics.html")
+          test "$status_code" = "401"

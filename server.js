@@ -4,13 +4,54 @@ const { createStorage } = require('./lib/storage');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ANALYTICS_ADMIN_USERNAME = 'admin';
-const storageReady = createStorage();
 const MAX_CHAT_MESSAGE_LENGTH = 1000;
 const MAX_ANALYTICS_PROPERTIES_LENGTH = 5000;
 const ALLOWED_ANALYTICS_EVENT_NAME = /^[a-z0-9_]{1,80}$/;
+const STORAGE_INIT_MAX_ATTEMPTS = 3;
+const STORAGE_INIT_RETRY_DELAY_MS = 300;
+
+let storageReady = null;
 
 app.disable('x-powered-by');
 app.set('trust proxy', true);
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function beginStorageInitialization() {
+  const pendingStorage = createStorage();
+
+  // Clear the cached initialization promise after failures so the next request can retry.
+  pendingStorage.catch(() => {
+    if (storageReady === pendingStorage) {
+      storageReady = null;
+    }
+  });
+
+  storageReady = pendingStorage;
+  return pendingStorage;
+}
+
+async function getStorage() {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= STORAGE_INIT_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await (storageReady || beginStorageInitialization());
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < STORAGE_INIT_MAX_ATTEMPTS) {
+        await wait(STORAGE_INIT_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  throw lastError;
+}
 
 function sanitizeProfileId(rawId) {
   return String(rawId || '')
@@ -101,7 +142,7 @@ app.use(express.static('public'));
 
 app.get('/api/health', async (req, res) => {
   try {
-    const storage = await storageReady;
+    const storage = await getStorage();
     return res.json({
       ok: true,
       storage: storage.label || 'unknown',
@@ -136,32 +177,32 @@ function normalizeGoalTarget(goalTarget) {
 
 
 async function saveSyncedProfile(profileId, history, goalTarget) {
-  const storage = await storageReady;
+  const storage = await getStorage();
   return storage.saveSyncedProfile(profileId, history, goalTarget);
 }
 
 async function getSyncedProfile(profileId) {
-  const storage = await storageReady;
+  const storage = await getStorage();
   return storage.getSyncedProfile(profileId);
 }
 
 async function saveAnalyticsEvent(sessionId, eventName, properties) {
-  const storage = await storageReady;
+  const storage = await getStorage();
   return storage.saveAnalyticsEvent(sessionId, eventName, properties);
 }
 
 async function getAnalyticsSummary() {
-  const storage = await storageReady;
+  const storage = await getStorage();
   return storage.getAnalyticsSummary();
 }
 
 async function exportAdminData() {
-  const storage = await storageReady;
+  const storage = await getStorage();
   return storage.exportAdminData();
 }
 
 async function restoreAdminData(payload) {
-  const storage = await storageReady;
+  const storage = await getStorage();
   return storage.restoreAdminData(payload);
 }
 
