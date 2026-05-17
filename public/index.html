@@ -253,6 +253,37 @@
                     </button>
                 </div>
 
+                <div class="doctor-directory">
+                    <h3>
+                        <i class="fas fa-user-doctor"></i>
+                        Doctor Contacts in Nigeria
+                    </h3>
+                    <p id="doctorDirectoryNote" class="doctor-directory-note">
+                        If you need medical support, you can contact one of these providers.
+                    </p>
+                    <div class="doctor-directory-controls">
+                        <div class="doctor-filter-group">
+                            <label for="doctorCityFilter">City</label>
+                            <select id="doctorCityFilter">
+                                <option value="">All Cities</option>
+                            </select>
+                        </div>
+                        <div class="doctor-filter-group">
+                            <label for="doctorSpecialtyFilter">Specialty</label>
+                            <select id="doctorSpecialtyFilter">
+                                <option value="">All Specialties</option>
+                            </select>
+                        </div>
+                        <button id="doctorRefreshBtn" class="doctor-refresh-btn" type="button">
+                            <i class="fas fa-rotate"></i>
+                            Refresh List
+                        </button>
+                    </div>
+                    <p id="doctorDirectoryUpdated" class="doctor-directory-updated"></p>
+                    <p id="doctorDirectoryCount" class="doctor-directory-count"></p>
+                    <div id="doctorDirectoryList" class="doctor-directory-list"></div>
+                </div>
+
                 <div class="post-assessment-cta">
                     <h3 id="ctaTitle">
                         <i class="fas fa-bullseye"></i>

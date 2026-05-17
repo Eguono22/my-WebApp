@@ -38,6 +38,7 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border-radius: 24px;
     box-shadow: var(--shadow-xl);
@@ -700,6 +701,176 @@ header h1 {
 
 .recommendations h3 i {
     color: #f59e0b;
+}
+
+.doctor-directory {
+    background: linear-gradient(135deg, #ecfeff 0%, #dbeafe 100%);
+    padding: 30px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    border-left: 5px solid #0ea5e9;
+    box-shadow: var(--shadow-md);
+}
+
+.doctor-directory h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #075985;
+    margin-bottom: 12px;
+    font-size: 1.35em;
+}
+
+.doctor-directory h3 i {
+    color: #0284c7;
+}
+
+.doctor-directory-note {
+    color: #0c4a6e;
+    margin-bottom: 18px;
+}
+
+.doctor-directory-controls {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) minmax(160px, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+
+.doctor-filter-group {
+    display: grid;
+    gap: 6px;
+}
+
+.doctor-filter-group label {
+    color: #0c4a6e;
+    font-weight: 600;
+    font-size: 0.88rem;
+}
+
+.doctor-filter-group select {
+    border: 1px solid #7dd3fc;
+    border-radius: 10px;
+    background: white;
+    color: #0f172a;
+    padding: 10px 12px;
+    font-family: inherit;
+}
+
+.doctor-refresh-btn {
+    border: 1px solid #0284c7;
+    border-radius: 10px;
+    background: #0284c7;
+    color: white;
+    padding: 10px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: fit-content;
+}
+
+.doctor-refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.doctor-refresh-btn:hover:not(:disabled) {
+    background: #0369a1;
+}
+
+.doctor-directory-count {
+    margin-bottom: 12px;
+    color: #0c4a6e;
+    font-weight: 600;
+}
+
+.doctor-directory-updated {
+    margin-bottom: 8px;
+    color: #0f766e;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.doctor-directory-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+}
+
+.doctor-loading {
+    padding: 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #0c4a6e;
+    font-weight: 600;
+}
+
+.doctor-card {
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid #bae6fd;
+    border-radius: 14px;
+    padding: 16px;
+    display: grid;
+    gap: 8px;
+}
+
+.doctor-card h4 {
+    color: #0f172a;
+    font-size: 1.05rem;
+}
+
+.doctor-meta {
+    color: #334155;
+    font-size: 0.93rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.doctor-meta i {
+    color: #0284c7;
+}
+
+.doctor-phone,
+.doctor-whatsapp {
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+}
+
+.doctor-phone {
+    color: #0f766e;
+}
+
+.doctor-whatsapp {
+    color: #15803d;
+}
+
+.doctor-profile {
+    color: #1d4ed8;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+}
+
+.doctor-no-phone {
+    color: #64748b;
+    font-weight: 600;
+}
+
+.doctor-phone:hover,
+.doctor-whatsapp:hover,
+.doctor-profile:hover {
+    text-decoration: underline;
 }
 
 .post-assessment-cta {
@@ -1644,6 +1815,15 @@ footer {
     .analytics-grid,
     .analytics-panels {
         grid-template-columns: 1fr;
+    }
+
+    .doctor-directory-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .doctor-refresh-btn {
+        width: 100%;
+        justify-content: center;
     }
 }
 

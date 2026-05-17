@@ -9,8 +9,18 @@ const MAX_ANALYTICS_PROPERTIES_LENGTH = 5000;
 const ALLOWED_ANALYTICS_EVENT_NAME = /^[a-z0-9_]{1,80}$/;
 const STORAGE_INIT_MAX_ATTEMPTS = 3;
 const STORAGE_INIT_RETRY_DELAY_MS = 300;
+const DOCTOR_SOURCE_BASE_URL = 'https://ng.aldoctorz.com/doctors/nigeria/all-specialties/';
+const DOCTOR_SOURCE_MAX_LIMIT = 200;
+const DOCTOR_SOURCE_MAX_PAGES = 10;
+const DOCTOR_SOURCE_CACHE_TTL_MS = 10 * 60 * 1000;
 
 let storageReady = null;
+let doctorDirectoryCache = {
+  doctors: [],
+  fetchedAt: null,
+  expiresAt: 0,
+  pages: 0
+};
 
 app.disable('x-powered-by');
 app.set('trust proxy', true);
@@ -62,6 +72,112 @@ function sanitizeProfileId(rawId) {
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function decodeHtmlEntities(text) {
+  return String(text || '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stripHtml(text) {
+  return decodeHtmlEntities(String(text || '').replace(/<[^>]*>/g, ' '));
+}
+
+function extractDoctorCardsFromHtml(html) {
+  const doctorHeadingRegex = /<h2[^>]*>\s*<a[^>]*href="([^"]*\/dr\/[^\"]+)"[^>]*>([^<]+)<\/a>\s*<\/h2>/gi;
+  const matches = [];
+  let match;
+
+  while ((match = doctorHeadingRegex.exec(html)) !== null) {
+    matches.push({
+      startIndex: match.index,
+      profileUrl: match[1],
+      name: stripHtml(match[2])
+    });
+  }
+
+  if (!matches.length) {
+    return [];
+  }
+
+  return matches.map((entry, index) => {
+    const nextIndex = index + 1 < matches.length ? matches[index + 1].startIndex : html.length;
+    const segment = html.slice(entry.startIndex, nextIndex);
+
+    const specialtyMatch = segment.match(/Doctor\s*<a[^>]*>\s*([^<]+)\s*<\/a>/i);
+    const addressMatch = segment.match(/Address\s*:\s*([^<\n]+)/i);
+    const cityMatch = segment.match(/City\s*:\s*([\s\S]*?)<\/(?:h6|p)>/i);
+    const cityLinks = cityMatch ? Array.from(cityMatch[1].matchAll(/<a[^>]*>([^<]+)<\/a>/gi)) : [];
+    const city = cityLinks.length
+      ? cityLinks.map((item) => stripHtml(item[1])).filter(Boolean).join(', ')
+      : '';
+    const phoneMatch = segment.match(/(\+?234[-\s]?\d(?:[-\s]?\d){8,13}|0\d{10})/);
+
+    const normalizedProfileUrl = entry.profileUrl.startsWith('http')
+      ? entry.profileUrl
+      : `https://ng.aldoctorz.com${entry.profileUrl.startsWith('/') ? '' : '/'}${entry.profileUrl}`;
+
+    return {
+      name: entry.name,
+      specialty: specialtyMatch ? stripHtml(specialtyMatch[1]) : 'General Practice',
+      location: city || 'Nigeria',
+      facility: addressMatch ? stripHtml(addressMatch[1]) : '',
+      phone: phoneMatch ? stripHtml(phoneMatch[1]) : '',
+      profileUrl: normalizedProfileUrl,
+      source: 'Aldoctorz'
+    };
+  });
+}
+
+async function fetchDoctorsFromSource(limit, pages) {
+  const collected = [];
+  const seenProfileUrls = new Set();
+
+  for (let page = 1; page <= pages; page += 1) {
+    const pageUrl = page === 1 ? DOCTOR_SOURCE_BASE_URL : `${DOCTOR_SOURCE_BASE_URL}page/${page}/`;
+
+    let response;
+    try {
+      response = await fetch(pageUrl, {
+        headers: {
+          'User-Agent': 'HealthAssessmentHubBot/1.0 (+https://healthassessmenthub.com)'
+        }
+      });
+    } catch (error) {
+      console.error(`Doctor source request failed for page ${page}:`, error);
+      continue;
+    }
+
+    if (!response.ok) {
+      console.error(`Doctor source returned ${response.status} for page ${page}`);
+      continue;
+    }
+
+    const html = await response.text();
+    const pageDoctors = extractDoctorCardsFromHtml(html);
+
+    for (const doctor of pageDoctors) {
+      if (!doctor.profileUrl || seenProfileUrls.has(doctor.profileUrl)) {
+        continue;
+      }
+
+      seenProfileUrls.add(doctor.profileUrl);
+      collected.push(doctor);
+
+      if (collected.length >= limit) {
+        return collected;
+      }
+    }
+  }
+
+  return collected;
 }
 
 function getAnalyticsAdminPassword() {
@@ -574,6 +690,74 @@ app.post('/api/chat', (req, res) => {
     res.status(500).json({ 
       error: 'An error occurred while processing your message' 
     });
+  }
+});
+
+app.get('/api/doctors/nigeria', async (req, res) => {
+  try {
+    const rawLimit = Number(req.query.limit || 30);
+    const rawPages = Number(req.query.pages || 3);
+    const forceRefresh = String(req.query.refresh || '').toLowerCase() === 'true';
+    const limit = Math.min(DOCTOR_SOURCE_MAX_LIMIT, Math.max(1, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 30));
+    const pages = Math.min(DOCTOR_SOURCE_MAX_PAGES, Math.max(1, Number.isFinite(rawPages) ? Math.floor(rawPages) : 3));
+    const now = Date.now();
+
+    const cacheIsFresh = now < doctorDirectoryCache.expiresAt;
+    const cacheMatchesRequest = doctorDirectoryCache.pages >= pages && doctorDirectoryCache.doctors.length >= limit;
+
+    if (!forceRefresh && cacheIsFresh && cacheMatchesRequest) {
+      return res.json({
+        source: DOCTOR_SOURCE_BASE_URL,
+        fetchedAt: doctorDirectoryCache.fetchedAt,
+        total: limit,
+        doctors: doctorDirectoryCache.doctors.slice(0, limit),
+        cached: true,
+        stale: false
+      });
+    }
+
+    const doctors = await fetchDoctorsFromSource(limit, pages);
+
+    if (doctors.length) {
+      doctorDirectoryCache = {
+        doctors,
+        fetchedAt: new Date().toISOString(),
+        expiresAt: now + DOCTOR_SOURCE_CACHE_TTL_MS,
+        pages
+      };
+
+      return res.json({
+        source: DOCTOR_SOURCE_BASE_URL,
+        fetchedAt: doctorDirectoryCache.fetchedAt,
+        total: doctors.length,
+        doctors,
+        cached: false,
+        stale: false
+      });
+    }
+
+    if (doctorDirectoryCache.doctors.length) {
+      return res.json({
+        source: DOCTOR_SOURCE_BASE_URL,
+        fetchedAt: doctorDirectoryCache.fetchedAt,
+        total: Math.min(limit, doctorDirectoryCache.doctors.length),
+        doctors: doctorDirectoryCache.doctors.slice(0, limit),
+        cached: true,
+        stale: true
+      });
+    }
+
+    return res.json({
+      source: DOCTOR_SOURCE_BASE_URL,
+      fetchedAt: new Date().toISOString(),
+      total: doctors.length,
+      doctors,
+      cached: false,
+      stale: false
+    });
+  } catch (error) {
+    console.error('Doctor directory fetch error:', error);
+    return res.status(500).json({ error: 'Unable to load doctor directory from source' });
   }
 });
 

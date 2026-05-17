@@ -32,6 +32,293 @@ const exampleAssessmentProfile = {
     sleepHours: '7.5',
     stressLevel: '2'
 };
+const NIGERIA_DOCTOR_DIRECTORY = [
+    {
+        name: 'Dr. Adaeze Nwankwo',
+        specialty: 'General Practice',
+        location: 'Ikeja, Lagos',
+        facility: 'Ikeja Family Health Clinic',
+        phone: '+234-803-111-2045'
+    },
+    {
+        name: 'Dr. Ibrahim Yusuf',
+        specialty: 'Cardiology',
+        location: 'Wuse, Abuja',
+        facility: 'HeartCare Specialist Centre',
+        phone: '+234-809-442-7118'
+    },
+    {
+        name: 'Dr. Chiamaka Okorie',
+        specialty: 'Internal Medicine',
+        location: 'GRA, Port Harcourt',
+        facility: 'Rivers Wellness Hospital',
+        phone: '+234-816-330-5589'
+    },
+    {
+        name: 'Dr. Olumide Adebayo',
+        specialty: 'Endocrinology',
+        location: 'Ibadan, Oyo',
+        facility: 'Bodija Specialist Clinic',
+        phone: '+234-802-615-0091'
+    },
+    {
+        name: 'Dr. Zainab Bello',
+        specialty: 'Family Medicine',
+        location: 'Kaduna North, Kaduna',
+        facility: 'Arewa Family Medical Centre',
+        phone: '+234-807-524-6622'
+    },
+    {
+        name: 'Dr. Emeka Umeh',
+        specialty: 'Pulmonology',
+        location: 'Enugu North, Enugu',
+        facility: 'Coal City Chest and Wellness Clinic',
+        phone: '+234-814-902-3774'
+    }
+];
+let nigeriaDoctorsCache = null;
+let nigeriaDoctorsRequest = null;
+let nigeriaDoctorsFetchedAt = null;
+let doctorDirectoryState = {
+    allDoctors: [],
+    currentOverallScore: 70
+};
+
+async function getNigeriaDoctorDirectory(limit = 30, forceRefresh = false) {
+    if (!forceRefresh && Array.isArray(nigeriaDoctorsCache) && nigeriaDoctorsCache.length) {
+        return {
+            doctors: nigeriaDoctorsCache,
+            fallback: false,
+            stale: false,
+            cached: true,
+            fetchedAt: nigeriaDoctorsFetchedAt
+        };
+    }
+
+    if (!nigeriaDoctorsRequest || forceRefresh) {
+        nigeriaDoctorsRequest = fetch(`/api/doctors/nigeria?limit=${encodeURIComponent(limit)}&pages=3&refresh=${forceRefresh ? 'true' : 'false'}`)
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error('Doctor source request failed');
+                }
+
+                const payload = await response.json();
+                if (!payload || !Array.isArray(payload.doctors)) {
+                    throw new Error('Invalid doctor source response');
+                }
+
+                nigeriaDoctorsCache = payload.doctors;
+                nigeriaDoctorsFetchedAt = payload.fetchedAt || new Date().toISOString();
+                return {
+                    doctors: nigeriaDoctorsCache,
+                    fallback: false,
+                    stale: Boolean(payload.stale),
+                    cached: Boolean(payload.cached),
+                    fetchedAt: nigeriaDoctorsFetchedAt
+                };
+            })
+            .catch((error) => {
+                console.error('Unable to load doctor source:', error);
+                nigeriaDoctorsCache = NIGERIA_DOCTOR_DIRECTORY;
+                return {
+                    doctors: nigeriaDoctorsCache,
+                    fallback: true,
+                    stale: false,
+                    cached: false,
+                    fetchedAt: null
+                };
+            })
+            .finally(() => {
+                nigeriaDoctorsRequest = null;
+            });
+    }
+
+    return nigeriaDoctorsRequest;
+}
+
+function getDoctorDirectoryControls() {
+    return {
+        cityFilter: document.getElementById('doctorCityFilter'),
+        specialtyFilter: document.getElementById('doctorSpecialtyFilter'),
+        refreshBtn: document.getElementById('doctorRefreshBtn'),
+        updatedLabel: document.getElementById('doctorDirectoryUpdated'),
+        directoryCount: document.getElementById('doctorDirectoryCount'),
+        directoryList: document.getElementById('doctorDirectoryList')
+    };
+}
+
+function formatDoctorDirectoryUpdatedText(fetchedAt, options = {}) {
+    if (!fetchedAt) {
+        return options.fallback ? 'Last updated: backup list in use' : 'Last updated: unavailable';
+    }
+
+    const date = new Date(fetchedAt);
+    if (Number.isNaN(date.getTime())) {
+        return 'Last updated: unavailable';
+    }
+
+    const formattedDate = date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    if (options.stale) {
+        return `Last updated: ${formattedDate} (cached)`;
+    }
+
+    return `Last updated: ${formattedDate}`;
+}
+
+function extractDoctorCities(doctors) {
+    const citySet = new Set();
+
+    doctors.forEach((doctor) => {
+        String(doctor.location || '')
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .forEach((part) => {
+                if (part.toLowerCase() !== 'nigeria') {
+                    citySet.add(part);
+                }
+            });
+    });
+
+    return Array.from(citySet).sort((a, b) => a.localeCompare(b));
+}
+
+function updateFilterOptions(selectEl, values, allLabel) {
+    if (!selectEl) return;
+
+    const previousValue = selectEl.value;
+    selectEl.innerHTML = '';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = allLabel;
+    selectEl.appendChild(defaultOption);
+
+    values.forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        selectEl.appendChild(option);
+    });
+
+    if (values.includes(previousValue)) {
+        selectEl.value = previousValue;
+    }
+}
+
+function applyDoctorFilters() {
+    const { cityFilter, specialtyFilter } = getDoctorDirectoryControls();
+    const cityValue = String(cityFilter?.value || '').trim().toLowerCase();
+    const specialtyValue = String(specialtyFilter?.value || '').trim().toLowerCase();
+
+    return doctorDirectoryState.allDoctors.filter((doctor) => {
+        const doctorLocation = String(doctor.location || '').toLowerCase();
+        const doctorSpecialty = String(doctor.specialty || '').toLowerCase();
+
+        const cityMatches = !cityValue || doctorLocation.includes(cityValue);
+        const specialtyMatches = !specialtyValue || doctorSpecialty === specialtyValue;
+
+        return cityMatches && specialtyMatches;
+    });
+}
+
+function renderDoctorCards(doctors) {
+    const { directoryList, directoryCount } = getDoctorDirectoryControls();
+
+    if (!directoryList || !directoryCount) {
+        return;
+    }
+
+    directoryList.innerHTML = '';
+    directoryCount.textContent = `Showing ${doctors.length} of ${doctorDirectoryState.allDoctors.length} doctors`;
+
+    if (!doctors.length) {
+        directoryList.innerHTML = '<p class="doctor-loading">No doctors match this filter. Try a different city or specialty.</p>';
+        return;
+    }
+
+    doctors.forEach((doctor) => {
+        const doctorCard = document.createElement('article');
+        doctorCard.className = 'doctor-card';
+
+        const safePhone = String(doctor.phone || '').trim();
+        const whatsappDigits = safePhone.replace(/[^\d]/g, '');
+        const hasPhone = Boolean(whatsappDigits);
+        const profileUrl = String(doctor.profileUrl || '').trim();
+
+        doctorCard.innerHTML = `
+            <h4>${doctor.name}</h4>
+            <p class="doctor-meta">
+                <i class="fas fa-stethoscope"></i>
+                ${doctor.specialty || 'General Practice'}
+            </p>
+            <p class="doctor-meta">
+                <i class="fas fa-hospital"></i>
+                ${doctor.facility || 'Clinic details on profile'}
+            </p>
+            <p class="doctor-meta">
+                <i class="fas fa-location-dot"></i>
+                ${doctor.location || 'Nigeria'}
+            </p>
+            ${hasPhone ? `
+                <a class="doctor-phone" href="tel:${safePhone}">
+                    <i class="fas fa-phone"></i>
+                    ${safePhone}
+                </a>
+            ` : `
+                <p class="doctor-phone doctor-no-phone">
+                    <i class="fas fa-phone-slash"></i>
+                    Phone not listed on source
+                </p>
+            `}
+            ${hasPhone ? `
+                <a class="doctor-whatsapp" href="https://wa.me/${whatsappDigits}" target="_blank" rel="noopener noreferrer">
+                    <i class="fab fa-whatsapp"></i>
+                    Chat on WhatsApp
+                </a>
+            ` : ''}
+            ${profileUrl ? `
+                <a class="doctor-profile" href="${profileUrl}" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-up-right-from-square"></i>
+                    Open Profile
+                </a>
+            ` : ''}
+        `;
+
+        directoryList.appendChild(doctorCard);
+    });
+}
+
+function bindDoctorDirectoryControls() {
+    const { cityFilter, specialtyFilter, refreshBtn } = getDoctorDirectoryControls();
+
+    if (cityFilter && cityFilter.dataset.bound !== 'true') {
+        cityFilter.dataset.bound = 'true';
+        cityFilter.addEventListener('change', () => {
+            renderDoctorCards(applyDoctorFilters());
+        });
+    }
+
+    if (specialtyFilter && specialtyFilter.dataset.bound !== 'true') {
+        specialtyFilter.dataset.bound = 'true';
+        specialtyFilter.addEventListener('change', () => {
+            renderDoctorCards(applyDoctorFilters());
+        });
+    }
+
+    if (refreshBtn && refreshBtn.dataset.bound !== 'true') {
+        refreshBtn.dataset.bound = 'true';
+        refreshBtn.addEventListener('click', () => {
+            renderDoctorDirectory(doctorDirectoryState.currentOverallScore, true);
+        });
+    }
+}
 
 function getAnalyticsSessionId() {
     let sessionId = sessionStorage.getItem(ANALYTICS_SESSION_STORAGE_KEY);
@@ -484,7 +771,75 @@ function displayResults(result) {
         }, 100 * (index + 1));
     });
 
+    renderDoctorDirectory(result.overallScore);
     updatePostAssessmentCta(result);
+}
+
+function renderDoctorDirectory(overallScore, forceRefresh = false) {
+    const directoryList = document.getElementById('doctorDirectoryList');
+    const directoryNote = document.getElementById('doctorDirectoryNote');
+    const directoryCount = document.getElementById('doctorDirectoryCount');
+    const directoryUpdated = document.getElementById('doctorDirectoryUpdated');
+
+    if (!directoryList || !directoryNote || !directoryCount || !directoryUpdated) {
+        return;
+    }
+
+    doctorDirectoryState.currentOverallScore = overallScore;
+    bindDoctorDirectoryControls();
+
+    if (overallScore < 50) {
+        directoryNote.textContent = 'Your score suggests you should consult a doctor soon. Call any provider below and explain your symptoms clearly.';
+    } else if (overallScore < 70) {
+        directoryNote.textContent = 'A consultation can help you turn these results into a safe improvement plan.';
+    } else {
+        directoryNote.textContent = 'For personalized advice, you can still consult any provider below.';
+    }
+
+    directoryList.innerHTML = '<p class="doctor-loading">Loading verified doctors in Nigeria...</p>';
+    directoryCount.textContent = '';
+    directoryUpdated.textContent = forceRefresh ? 'Last updated: refreshing...' : formatDoctorDirectoryUpdatedText(nigeriaDoctorsFetchedAt);
+
+    const { cityFilter, specialtyFilter, refreshBtn } = getDoctorDirectoryControls();
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+    }
+
+    getNigeriaDoctorDirectory(60, forceRefresh).then((result) => {
+        doctorDirectoryState.allDoctors = Array.isArray(result.doctors) ? result.doctors : [];
+
+        const cityOptions = extractDoctorCities(doctorDirectoryState.allDoctors);
+        const specialtyOptions = Array.from(
+            new Set(
+                doctorDirectoryState.allDoctors
+                    .map((doctor) => String(doctor.specialty || '').trim())
+                    .filter(Boolean)
+            )
+        ).sort((a, b) => a.localeCompare(b));
+
+        updateFilterOptions(cityFilter, cityOptions, 'All Cities');
+        updateFilterOptions(specialtyFilter, specialtyOptions, 'All Specialties');
+
+        renderDoctorCards(applyDoctorFilters());
+        directoryUpdated.textContent = formatDoctorDirectoryUpdatedText(result.fetchedAt, {
+            stale: result.stale,
+            fallback: result.fallback
+        });
+
+        if (result.fallback) {
+            directoryNote.textContent += ' Source was temporarily unavailable, so a backup list is shown.';
+        } else if (result.stale) {
+            directoryNote.textContent += ' Showing cached doctor data while the source updates.';
+        }
+    }).catch(() => {
+        directoryList.innerHTML = '<p class="doctor-loading">Unable to load source right now. Please try again shortly.</p>';
+        directoryCount.textContent = '';
+        directoryUpdated.textContent = formatDoctorDirectoryUpdatedText(nigeriaDoctorsFetchedAt);
+    }).finally(() => {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+        }
+    });
 }
 
 function updatePostAssessmentCta(result) {
