@@ -28,26 +28,37 @@
     <div id="aiChatPanel" class="ai-chat-panel">
         <div class="chat-header">
             <div class="chat-header-content">
-                <i class="fas fa-robot"></i>
-                <div>
+                <div class="chat-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="chat-header-copy">
                     <h3>Health Assistant</h3>
                     <span class="status-indicator">Online</span>
+                    <p id="chatHeaderHint" class="chat-header-hint">Ask about your score, sleep, exercise, or next best step.</p>
                 </div>
             </div>
             <button id="closeChatBtn" class="close-chat-btn">
                 <i class="fas fa-times"></i>
             </button>
         </div>
+        <div class="chat-suggestion-panel">
+            <p class="chat-suggestion-label">Suggested prompts</p>
+            <div id="chatSuggestions" class="chat-suggestions" aria-label="Suggested prompts"></div>
+        </div>
         <div id="chatMessages" class="chat-messages">
             <div class="message bot-message">
                 <div class="message-content">
+                    <span class="message-tag"><i class="fas fa-sparkles"></i> Health Assistant</span>
                     <p>Hello! I'm your Health Assistant. I can help you understand your assessment results, answer general wellness questions, and suggest practical next steps.</p>
                     <p class="message-time">Just now</p>
                 </div>
             </div>
         </div>
         <div class="chat-input-container">
-            <input type="text" id="chatInput" placeholder="Ask me anything about your health..." autocomplete="off">
+            <div class="chat-input-shell">
+                <input type="text" id="chatInput" placeholder="Ask me anything about your health..." autocomplete="off">
+                <p id="chatInputHint" class="chat-input-hint">You can ask for a plan, explanation, or a simple wellness tip.</p>
+            </div>
             <button id="sendChatBtn">
                 <i class="fas fa-paper-plane"></i>
             </button>

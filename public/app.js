@@ -773,6 +773,7 @@ function displayResults(result) {
 
     renderDoctorDirectory(result.overallScore);
     updatePostAssessmentCta(result);
+    updateChatExperience(`score ${result.overallScore} ${result.status}`);
 }
 
 function renderDoctorDirectory(overallScore, forceRefresh = false) {
@@ -901,6 +902,7 @@ function resetForm() {
     clearFormDraft();
     updateFormProgress();
     currentAssessmentData = null;
+    updateChatExperience();
     
     // Show form and hide results
     document.querySelector('.form-section').style.display = 'block';
@@ -917,41 +919,196 @@ const closeChatBtn = document.getElementById('closeChatBtn');
 const chatInput = document.getElementById('chatInput');
 const sendChatBtn = document.getElementById('sendChatBtn');
 const chatMessages = document.getElementById('chatMessages');
+const chatSuggestions = document.getElementById('chatSuggestions');
+const chatHeaderHint = document.getElementById('chatHeaderHint');
+const chatInputHint = document.getElementById('chatInputHint');
 const askAiBtn = document.getElementById('askAiBtn');
 const ctaPrimaryBtn = document.getElementById('ctaPrimaryBtn');
+const DEFAULT_CHAT_SUGGESTIONS = [
+    'Explain what a good health score means',
+    'Give me 3 simple stress-reduction habits',
+    'How much exercise should I aim for this week?',
+    'What does healthy sleep usually look like?'
+];
+
+function openChatPanel(source, prefillMessage = '') {
+    aiChatPanel.classList.add('active');
+    aiChatBtn.style.display = 'none';
+    updateChatExperience();
+    chatInput.focus();
+    trackEvent('chat_opened', { source });
+
+    if (prefillMessage) {
+        setTimeout(() => {
+            chatInput.value = prefillMessage;
+            chatInput.focus();
+            updateChatComposerHint(prefillMessage);
+        }, 200);
+    }
+}
+
+function closeChatPanel() {
+    aiChatPanel.classList.remove('active');
+    aiChatBtn.style.display = 'flex';
+}
+
+function getAssessmentAwareSuggestions() {
+    if (!currentAssessmentData) {
+        return DEFAULT_CHAT_SUGGESTIONS;
+    }
+
+    const suggestions = [];
+    const score = Number(currentAssessmentData.overallScore || 0);
+
+    suggestions.push('Summarize my latest assessment in simple language');
+
+    if (score < 50) {
+        suggestions.push('What should I improve first this week?');
+        suggestions.push('When should I talk to a doctor about these results?');
+    } else if (score < 70) {
+        suggestions.push('Create a 7-day plan to improve my score');
+        suggestions.push('Which metric is holding my score back the most?');
+    } else {
+        suggestions.push('How can I maintain this score over the next month?');
+        suggestions.push('What healthy habit would improve my score the most?');
+    }
+
+    suggestions.push('Turn my results into a daily routine');
+    return suggestions;
+}
+
+function buildFollowUpSuggestions(lastMessage = '') {
+    const normalized = String(lastMessage || '').toLowerCase();
+
+    if (normalized.includes('sleep')) {
+        return [
+            'How do I improve my sleep schedule?',
+            'What bedtime habits help most?',
+            'How many hours should I target each night?'
+        ];
+    }
+
+    if (normalized.includes('stress')) {
+        return [
+            'Give me a 5-minute stress reset',
+            'What are signs my stress is too high?',
+            'How can I lower stress during work?'
+        ];
+    }
+
+    if (normalized.includes('exercise') || normalized.includes('workout')) {
+        return [
+            'Build me a beginner weekly exercise plan',
+            'How much cardio do I need?',
+            'What if I only have 20 minutes a day?'
+        ];
+    }
+
+    if (normalized.includes('blood pressure') || normalized.includes('bp') || normalized.includes('heart')) {
+        return [
+            'What supports healthy blood pressure?',
+            'Which foods can help my heart health?',
+            'What numbers should I keep an eye on?'
+        ];
+    }
+
+    return getAssessmentAwareSuggestions();
+}
+
+function updateChatHeader() {
+    if (!chatHeaderHint) {
+        return;
+    }
+
+    if (!currentAssessmentData) {
+        chatHeaderHint.textContent = 'Ask about your score, sleep, exercise, or next best step.';
+        return;
+    }
+
+    const score = Number(currentAssessmentData.overallScore || 0);
+
+    if (score < 50) {
+        chatHeaderHint.textContent = `Latest score: ${score}. Let's focus on the safest first improvements.`;
+    } else if (score < 70) {
+        chatHeaderHint.textContent = `Latest score: ${score}. I can help turn these results into a realistic weekly plan.`;
+    } else {
+        chatHeaderHint.textContent = `Latest score: ${score}. Let's protect your progress and improve your consistency.`;
+    }
+}
+
+function updateChatComposerHint(prefillMessage = '') {
+    if (!chatInputHint) {
+        return;
+    }
+
+    const normalized = String(prefillMessage || chatInput.value || '').toLowerCase();
+
+    if (!normalized) {
+        chatInputHint.textContent = currentAssessmentData
+            ? 'Try asking for a simple explanation, a weekly plan, or a habit checklist.'
+            : 'You can ask for a plan, explanation, or a simple wellness tip.';
+        return;
+    }
+
+    if (normalized.includes('plan')) {
+        chatInputHint.textContent = 'Ask for a daily, weekly, or beginner-friendly plan.';
+        return;
+    }
+
+    if (normalized.includes('score') || normalized.includes('result')) {
+        chatInputHint.textContent = 'You can ask which metric matters most or what to improve first.';
+        return;
+    }
+
+    chatInputHint.textContent = 'Press Enter to send, or pick one of the guided prompts above.';
+}
+
+function renderChatSuggestions(prompts) {
+    if (!chatSuggestions) {
+        return;
+    }
+
+    chatSuggestions.innerHTML = '';
+
+    prompts.slice(0, 4).forEach((prompt) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'chat-suggestion-chip';
+        button.textContent = prompt;
+        button.addEventListener('click', () => {
+            chatInput.value = prompt;
+            updateChatComposerHint(prompt);
+            sendMessage(prompt, 'suggestion_chip');
+        });
+        chatSuggestions.appendChild(button);
+    });
+}
+
+function updateChatExperience(lastMessage = '') {
+    updateChatHeader();
+    updateChatComposerHint(lastMessage);
+    renderChatSuggestions(buildFollowUpSuggestions(lastMessage));
+}
 
 // Toggle chat panel
 aiChatBtn.addEventListener('click', () => {
-    aiChatPanel.classList.add('active');
-    aiChatBtn.style.display = 'none';
-    chatInput.focus();
-    trackEvent('chat_opened', {
-        source: 'floating_button'
-    });
+    openChatPanel('floating_button');
 });
 
 closeChatBtn.addEventListener('click', () => {
-    aiChatPanel.classList.remove('active');
-    aiChatBtn.style.display = 'flex';
+    closeChatPanel();
 });
 
 // Open chat from results page
 if (askAiBtn) {
     askAiBtn.addEventListener('click', () => {
-        aiChatPanel.classList.add('active');
-        aiChatBtn.style.display = 'none';
-        chatInput.focus();
-        trackEvent('chat_opened', {
-            source: 'results_follow_up'
-        });
-        
-        // Send initial context message
         if (currentAssessmentData) {
             const contextMessage = `I just completed a health assessment. My overall score is ${currentAssessmentData.overallScore} (${currentAssessmentData.status}). Can you help me understand my results better?`;
-            setTimeout(() => {
-                chatInput.value = contextMessage;
-            }, 300);
+            openChatPanel('results_follow_up', contextMessage);
+            return;
         }
+
+        openChatPanel('results_follow_up');
     });
 }
 
@@ -1174,41 +1331,39 @@ function renderTrendChart(history) {
 
 if (ctaPrimaryBtn) {
     ctaPrimaryBtn.addEventListener('click', () => {
-        aiChatPanel.classList.add('active');
-        aiChatBtn.style.display = 'none';
-        chatInput.focus();
-        trackEvent('chat_opened', {
-            source: 'results_cta'
-        });
-
         const prompt = ctaPrimaryBtn.dataset.aiPrompt || 'Create a practical health action plan from my assessment results.';
-        setTimeout(() => {
-            chatInput.value = prompt;
-        }, 300);
+        openChatPanel('results_cta', prompt);
     });
 }
 
 // Send message
-sendChatBtn.addEventListener('click', sendMessage);
+sendChatBtn.addEventListener('click', () => {
+    sendMessage();
+});
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
     }
 });
+chatInput.addEventListener('input', () => {
+    updateChatComposerHint();
+});
 
-async function sendMessage() {
-    const message = chatInput.value.trim();
+async function sendMessage(forcedMessage = '', source = 'typed_input') {
+    const message = String(forcedMessage || chatInput.value).trim();
     if (!message) return;
 
     trackEvent('chat_message_sent', {
         hasAssessmentContext: Boolean(currentAssessmentData),
-        messageLength: message.length
+        messageLength: message.length,
+        source
     });
     
     // Add user message to chat
     addMessage(message, 'user');
     chatInput.value = '';
+    updateChatComposerHint();
     
     // Show typing indicator
     const typingIndicator = addTypingIndicator();
@@ -1237,11 +1392,13 @@ async function sendMessage() {
         
         // Add bot response
         addMessage(data.response, 'bot');
+        updateChatExperience(message);
         
     } catch (error) {
         console.error('Chat error:', error);
         typingIndicator.remove();
         addMessage('I apologize, but I\'m having trouble connecting right now. Please try again in a moment.', 'bot');
+        updateChatExperience(message);
     }
 }
 
@@ -1255,6 +1412,12 @@ function addMessage(text, sender) {
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
 
+    const messageTag = document.createElement('span');
+    messageTag.className = 'message-tag';
+    messageTag.innerHTML = sender === 'bot'
+        ? '<i class="fas fa-sparkles"></i> Health Assistant'
+        : '<i class="fas fa-user"></i> You';
+
     const textParagraph = document.createElement('p');
     textParagraph.textContent = text;
 
@@ -1262,6 +1425,7 @@ function addMessage(text, sender) {
     timeSpan.className = 'message-time';
     timeSpan.textContent = timeString;
 
+    contentDiv.appendChild(messageTag);
     contentDiv.appendChild(textParagraph);
     contentDiv.appendChild(timeSpan);
     messageDiv.appendChild(contentDiv);
@@ -1277,6 +1441,7 @@ function addTypingIndicator() {
     indicator.className = 'message bot-message';
     indicator.innerHTML = `
         <div class="message-content">
+            <span class="message-tag"><i class="fas fa-sparkles"></i> Health Assistant</span>
             <div class="typing-indicator">
                 <span></span>
                 <span></span>
@@ -1398,6 +1563,7 @@ window.addEventListener('load', () => {
         path: window.location.pathname
     });
 
+    updateChatExperience();
     initializeFormExperience();
 
     const savedDraft = getFormDraft();
