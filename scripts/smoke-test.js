@@ -56,6 +56,16 @@ async function run() {
             /id="historyChartEmpty"/,
             'Home page should include the history chart empty state.'
         );
+        assert.match(
+            home.text,
+            /id="doctorDirectoryList"/,
+            'Home page should include the doctor directory list container.'
+        );
+        assert.match(
+            home.text,
+            /id="doctorRefreshBtn"/,
+            'Home page should include the doctor directory refresh button.'
+        );
 
         const favicon = await fetchText(`${BASE_URL}/favicon.ico`);
         assert.equal(favicon.response.status, 200, 'Favicon route should return 200.');
@@ -69,6 +79,33 @@ async function run() {
         assert.equal(health.response.status, 200, 'Health endpoint should return 200.');
         assert.equal(health.json?.ok, true, 'Health endpoint should report ok.');
         assert.equal(typeof health.json?.storage, 'string', 'Health endpoint should report storage type.');
+
+        const doctorDirectory = await fetchJson(`${BASE_URL}/api/doctors/nigeria?limit=5&pages=1`);
+        assert.equal(
+            doctorDirectory.response.status,
+            200,
+            'Doctor directory endpoint should return 200.'
+        );
+        assert.equal(
+            Array.isArray(doctorDirectory.json?.doctors),
+            true,
+            'Doctor directory endpoint should return a doctors array.'
+        );
+        assert.equal(
+            typeof doctorDirectory.json?.cached,
+            'boolean',
+            'Doctor directory endpoint should report whether the response was cached.'
+        );
+        assert.equal(
+            typeof doctorDirectory.json?.stale,
+            'boolean',
+            'Doctor directory endpoint should report whether the response was stale.'
+        );
+        assert.equal(
+            typeof doctorDirectory.json?.source,
+            'string',
+            'Doctor directory endpoint should report its upstream source.'
+        );
 
         const blockedAnalyticsPage = await fetchText(`${BASE_URL}/analytics.html`, {
             redirect: 'manual'
