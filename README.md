@@ -26,6 +26,7 @@ npm install
 ```
 
 Supported Node.js versions: `20` and `22`.
+Vercel production is pinned to these supported majors through `package.json` so deployments do not auto-upgrade to newer Node releases unexpectedly.
 
 ## Usage
 

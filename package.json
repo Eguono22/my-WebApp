@@ -4,7 +4,7 @@
   "description": "Intelligent computer systems application to assess human health",
   "main": "server.js",
   "engines": {
-    "node": ">=20"
+    "node": "20.x || 22.x"
   },
   "scripts": {
     "start": "node server.js",

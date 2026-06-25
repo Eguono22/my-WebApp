@@ -41,7 +41,7 @@ jobs:
       - name: Verify production readiness endpoint
         run: |
           curl --fail --silent --show-error "$PRODUCTION_URL/api/readiness" --output readiness.json
-          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('readiness.json','utf8')); if (!data.ok) throw new Error('Readiness endpoint did not return ok=true.'); if (!data.readiness || data.readiness.ready !== true) throw new Error('Production readiness check did not report ready=true.'); const checks=Array.isArray(data.readiness.checks)?data.readiness.checks:[]; const missing=checks.filter((check)=>check.required && !check.ok).map((check)=>check.name); if (missing.length) throw new Error(`Required readiness checks failed: ${missing.join(', ')}`);"
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('readiness.json','utf8')); if (!data.ok) throw new Error('Readiness endpoint did not return ok=true.'); if (!data.readiness || data.readiness.ready !== true) throw new Error('Production readiness check did not report ready=true.'); if (data.readiness.environment?.nodeMajor !== 22) throw new Error(`Expected production to run on Node 22, received ${data.readiness.environment?.nodeMajor ?? 'unknown'}.`); const checks=Array.isArray(data.readiness.checks)?data.readiness.checks:[]; const missing=checks.filter((check)=>check.required && !check.ok).map((check)=>check.name); if (missing.length) throw new Error(`Required readiness checks failed: ${missing.join(', ')}`);"
 
       - name: Verify analytics page requires authentication
         run: |
