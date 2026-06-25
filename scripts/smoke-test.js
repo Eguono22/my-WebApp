@@ -224,6 +224,33 @@ async function run() {
             'Assessment-completed analytics event should save.'
         );
 
+        const chatResponse = await fetchJson(`${BASE_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: 'Create a 7-day improvement plan',
+                context: assessment.json,
+                history: [
+                    {
+                        role: 'user',
+                        content: 'Summarize my latest assessment in simple language'
+                    }
+                ]
+            })
+        });
+        assert.equal(chatResponse.response.status, 200, 'Chat endpoint should return 200.');
+        assert.equal(typeof chatResponse.json?.response, 'string', 'Chat endpoint should return text.');
+        assert.equal(
+            Array.isArray(chatResponse.json?.followUpPrompts),
+            true,
+            'Chat endpoint should return follow-up prompts.'
+        );
+        assert.match(
+            chatResponse.json?.response || '',
+            /7-day|Day 1/i,
+            'Chat endpoint should return a structured plan for planning prompts.'
+        );
+
         const syncSave = await fetchJson(`${BASE_URL}/api/history/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

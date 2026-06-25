@@ -561,203 +561,564 @@ const healthAI = new HealthAssessmentAI();
 // Rule-based health chat assistant
 class HealthChatAgent {
   constructor() {
-    this.conversationHistory = [];
+    this.metricLabels = {
+      age: 'Age profile',
+      bmi: 'Weight balance',
+      bloodPressure: 'Blood pressure',
+      heartRate: 'Heart rate',
+      exercise: 'Exercise consistency',
+      sleep: 'Sleep quality',
+      stress: 'Stress management'
+    };
+    this.metricAdvice = {
+      age: 'Age cannot be changed, so the best leverage usually comes from strengthening the lifestyle metrics around it.',
+      bmi: 'Focus on sustainable nutrition, regular movement, and slow habit changes rather than aggressive dieting.',
+      bloodPressure: 'Reduce sodium, stay active, prioritize sleep, and monitor readings consistently.',
+      heartRate: 'A steadier exercise routine, better sleep, and reduced stimulant load often help over time.',
+      exercise: 'Increase activity gradually until movement is a normal part of most days each week.',
+      sleep: 'Protect a consistent sleep schedule and reduce late-night stimulation.',
+      stress: 'Build a repeatable stress-down routine instead of waiting until stress feels overwhelming.'
+    };
   }
 
-  generateResponse(userMessage, healthContext) {
-    // Simple rule-based responses
-    const message = userMessage.toLowerCase();
-    
-    // Check if user has health context
-    if (healthContext && healthContext.overallScore) {
-      // Context-aware responses
-      if (message.includes('score') || message.includes('result')) {
-        return this.explainScore(healthContext);
-      }
-      
-      if (message.includes('bmi') || message.includes('weight')) {
+  generateReply(userMessage, healthContext, conversationHistory = []) {
+    const message = String(userMessage || '').toLowerCase();
+    const safeHistory = Array.isArray(conversationHistory)
+      ? conversationHistory.filter(isPlainObject).slice(-8)
+      : [];
+    const intent = this.detectIntent(message, healthContext, safeHistory);
+
+    switch (intent) {
+      case 'greeting':
+        return {
+          response:
+            "Hello. I can explain your assessment, point out the weakest metric, build a realistic plan, or help you decide when professional follow-up makes sense.",
+          followUpPrompts: [
+            'Summarize my latest assessment in simple language',
+            'Which metric is holding my score back the most?',
+            'Create a 7-day improvement plan'
+          ]
+        };
+      case 'capabilities':
+        return {
+          response:
+            "Here is what I can help with:\n\n1. Explain your overall score and what is driving it.\n2. Highlight the top priority metric to work on first.\n3. Turn your results into a simple daily or weekly routine.\n4. Give targeted guidance on sleep, exercise, stress, weight, heart rate, or blood pressure.\n5. Suggest when it is wise to involve a healthcare professional.",
+          followUpPrompts: [
+            'Summarize my latest assessment in simple language',
+            'Turn my results into a daily routine',
+            'When should I talk to a doctor about these results?'
+          ]
+        };
+      case 'summary':
+        return this.summarizeAssessment(healthContext);
+      case 'priority':
+        return this.explainPriorityMetric(healthContext);
+      case 'plan':
+        return this.buildActionPlan(healthContext, safeHistory);
+      case 'doctor':
+        return this.discussDoctorSupport(healthContext);
+      case 'bmi':
         return this.explainBMI(healthContext);
-      }
-      
-      if (message.includes('blood pressure') || message.includes('bp')) {
+      case 'bloodPressure':
         return this.explainBloodPressure(healthContext);
-      }
-      
-      if (message.includes('exercise') || message.includes('workout')) {
+      case 'exercise':
         return this.adviceExercise(healthContext);
-      }
-      
-      if (message.includes('sleep')) {
+      case 'sleep':
         return this.adviceSleep(healthContext);
-      }
-      
-      if (message.includes('stress')) {
+      case 'stress':
         return this.adviceStress(healthContext);
-      }
-      
-      if (message.includes('improve') || message.includes('better')) {
-        return this.improvementSuggestions(healthContext);
-      }
+      case 'diet':
+        return this.adviceNutrition(healthContext);
+      case 'heart':
+        return this.explainHeartRate(healthContext);
+      default:
+        return this.defaultResponse(healthContext, safeHistory);
     }
-    
-    // General health questions
-    if (message.includes('hello') || message.includes('hi')) {
-      return "Hello! I'm your Health Assistant. I can help you understand your health metrics, provide general wellness guidance, and answer questions about your assessment results. How can I assist you today?";
-    }
-    
-    if (message.includes('what can you do') || message.includes('help')) {
-      return "I can help you with:\n\n• Understanding your health assessment results\n• Explaining health metrics like BMI, blood pressure, and heart rate\n• Providing personalized recommendations for improvement\n• Answering questions about diet, exercise, sleep, and stress management\n• Offering wellness tips and motivation\n\nFeel free to ask me anything!";
-    }
-    
-    if (message.includes('diet') || message.includes('food') || message.includes('eat')) {
-      return "A healthy diet is crucial for overall wellbeing! Focus on:\n\n• Plenty of fruits and vegetables (5-9 servings daily)\n• Whole grains over refined carbohydrates\n• Lean proteins (fish, chicken, beans, legumes)\n• Healthy fats (nuts, avocados, olive oil)\n• Limit processed foods, sugar, and sodium\n• Stay hydrated (8-10 glasses of water daily)\n\nWould you like specific dietary advice based on your health goals?";
-    }
-    
-    if (message.includes('heart') || message.includes('cardiovascular')) {
-      return "Heart health is vital! Here are key tips:\n\n• Exercise regularly (150 minutes moderate activity per week)\n• Maintain healthy blood pressure (<120/80 mmHg)\n• Keep cholesterol levels in check\n• Don't smoke or use tobacco\n• Manage stress effectively\n• Eat a heart-healthy diet (low in saturated fats)\n• Maintain a healthy weight\n\nRegular check-ups with your doctor are essential!";
-    }
-    
-    // Default response
-    return "That's an interesting question! While I can provide general health information, I recommend consulting with healthcare professionals for specific medical advice. Is there a particular health topic you'd like to know more about, such as nutrition, exercise, sleep, or stress management?";
   }
-  
-  explainScore(context) {
-    const score = context.overallScore;
-    const status = context.status;
-    
-    let response = `Your overall health score is ${score}/100, which is categorized as "${status}". `;
-    
-    if (score >= 85) {
-      response += "Excellent! You're in great health. Your lifestyle choices are contributing positively to your wellbeing. Keep up the fantastic work with your current habits!";
-    } else if (score >= 70) {
-      response += "Good work! You're maintaining decent health, but there's room for optimization. Focus on improving your lower-scoring metrics to reach excellent health.";
-    } else if (score >= 50) {
-      response += "Your health needs some attention. I recommend focusing on the areas where you scored lower. Small, consistent improvements in diet, exercise, and sleep can make a significant difference.";
-    } else {
-      response += "Your health requires immediate attention. Please consult with a healthcare provider for a comprehensive evaluation. In the meantime, start with small changes: increase physical activity, improve sleep habits, and manage stress better.";
+
+  detectIntent(message, healthContext, conversationHistory) {
+    const previousTopic = this.extractRecentTopic(conversationHistory);
+    const hasContext = Boolean(healthContext && healthContext.overallScore);
+
+    if (message.includes('hello') || message.includes('hi')) return 'greeting';
+    if (message.includes('what can you do') || message.includes('help')) return 'capabilities';
+    if (
+      hasContext &&
+      (message.includes('summarize') ||
+        message.includes('simple language') ||
+        message.includes('latest assessment') ||
+        message.includes('understand my results'))
+    ) {
+      return 'summary';
     }
-    
-    response += "\n\nWould you like specific advice on any health metric?";
-    return response;
-  }
-  
-  explainBMI(context) {
-    const bmi = context.bmi;
-    let category, advice;
-    
-    if (bmi < 18.5) {
-      category = "underweight";
-      advice = "Consider consulting a nutritionist to develop a healthy weight gain plan. Focus on nutrient-dense foods and strength training to build muscle mass.";
-    } else if (bmi < 25) {
-      category = "normal weight";
-      advice = "Great! Maintain your current weight through balanced nutrition and regular exercise. Continue your healthy lifestyle habits!";
-    } else if (bmi < 30) {
-      category = "overweight";
-      advice = "Focus on creating a caloric deficit through portion control and increased physical activity. Aim to lose 1-2 pounds per week safely. Consider consulting a dietitian for personalized guidance.";
-    } else {
-      category = "obese";
-      advice = "I recommend working with healthcare professionals to develop a comprehensive weight management plan. Focus on sustainable lifestyle changes rather than quick fixes. Small, consistent improvements matter!";
+    if (
+      hasContext &&
+      (message.includes('holding my score back') ||
+        message.includes('improve first') ||
+        message.includes('priority') ||
+        message.includes('focus first') ||
+        message.includes('weakest'))
+    ) {
+      return 'priority';
     }
-    
-    return `Your BMI is ${bmi}, which falls in the "${category}" category. ${advice}\n\nRemember, BMI is just one indicator and doesn't account for muscle mass or body composition. Would you like tips on healthy nutrition or exercise?`;
-  }
-  
-  explainBloodPressure(context) {
-    const systolic = context.systolic;
-    const diastolic = context.diastolic;
-    
-    let response = `Your blood pressure reading is ${systolic}/${diastolic} mmHg. `;
-    
-    if (systolic < 120 && diastolic < 80) {
-      response += "This is excellent! You have normal blood pressure. Maintain your healthy lifestyle to keep it in this range.";
-    } else if (systolic < 130 && diastolic < 85) {
-      response += "This is slightly elevated. Watch your sodium intake, exercise regularly, manage stress, and monitor your blood pressure regularly.";
-    } else if (systolic < 140 && diastolic < 90) {
-      response += "This indicates Stage 1 hypertension. Lifestyle modifications are important: reduce sodium, exercise more, limit alcohol, manage stress, and maintain healthy weight. Consult your doctor.";
-    } else {
-      response += "This is concerning and should be evaluated by a healthcare provider soon. In the meantime, reduce sodium intake, avoid excessive stress, and monitor your blood pressure regularly.";
+    if (
+      hasContext &&
+      (message.includes('7-day') ||
+        message.includes('plan') ||
+        message.includes('routine') ||
+        message.includes('daily') ||
+        message.includes('weekly') ||
+        message.includes('maintain this score') ||
+        message.includes('next month'))
+    ) {
+      return 'plan';
     }
-    
-    response += "\n\nWould you like tips on managing blood pressure through lifestyle changes?";
-    return response;
-  }
-  
-  adviceExercise(context) {
-    const exerciseHours = context.exerciseHours;
-    
-    let response = `You're currently exercising ${exerciseHours} hours per week. `;
-    
-    if (exerciseHours >= 5) {
-      response += "Excellent! You're meeting and exceeding guidelines. Ensure you're including variety: cardio, strength training, and flexibility exercises. Don't forget rest days for recovery!";
-    } else if (exerciseHours >= 3) {
-      response += "Good effort! You're meeting basic guidelines. Try to reach 5+ hours weekly by adding activities you enjoy. Mix cardio and strength training for optimal results.";
-    } else if (exerciseHours >= 1) {
-      response += "You're making a start! Gradually increase to 3-5 hours weekly. Start with activities you enjoy - walking, swimming, cycling, or dancing. Consistency is key!";
-    } else {
-      response += "Let's get you moving! Start small: 10-15 minutes of daily walking. Gradually increase duration and intensity. Find activities you enjoy to make exercise sustainable.";
+    if (
+      hasContext &&
+      (message.includes('doctor') ||
+        message.includes('healthcare professional') ||
+        message.includes('clinical') ||
+        message.includes('when should i talk'))
+    ) {
+      return 'doctor';
     }
-    
-    response += "\n\nRecommended weekly exercise:\n• 150 minutes moderate cardio (brisk walking, cycling)\n• 2-3 strength training sessions\n• Daily stretching or yoga\n\nWould you like specific workout suggestions?";
-    return response;
+    if (message.includes('score') || message.includes('result')) return hasContext ? 'summary' : 'capabilities';
+    if (message.includes('bmi') || message.includes('weight')) return 'bmi';
+    if (message.includes('blood pressure') || message.includes('bp')) return 'bloodPressure';
+    if (message.includes('sleep') || previousTopic === 'sleep') return 'sleep';
+    if (message.includes('stress') || previousTopic === 'stress') return 'stress';
+    if (message.includes('exercise') || message.includes('workout') || message.includes('cardio')) return 'exercise';
+    if (message.includes('diet') || message.includes('food') || message.includes('eat') || message.includes('nutrition')) return 'diet';
+    if (message.includes('heart') || message.includes('cardiovascular') || message.includes('heart rate')) return 'heart';
+
+    return hasContext ? 'summary' : 'default';
   }
-  
-  adviceSleep(context) {
-    const sleepHours = context.sleepHours;
-    
-    let response = `You're getting ${sleepHours} hours of sleep per night. `;
-    
-    if (sleepHours >= 7 && sleepHours <= 9) {
-      response += "Perfect! You're getting optimal sleep. Maintain consistent sleep/wake times, even on weekends, for best results.";
-    } else if (sleepHours < 7) {
-      response += "You need more sleep! Aim for 7-9 hours nightly. Tips:\n• Set a consistent bedtime\n• Create a relaxing pre-sleep routine\n• Avoid screens 1 hour before bed\n• Keep bedroom cool and dark\n• Limit caffeine after 2 PM\n• Avoid heavy meals before bedtime";
-    } else {
-      response += "You might be sleeping too much. While individual needs vary, 7-9 hours is typically optimal. Excessive sleep can indicate underlying issues. Consider consulting a healthcare provider if you regularly need 10+ hours.";
-    }
-    
-    response += "\n\nQuality matters as much as quantity! Would you like tips for improving sleep quality?";
-    return response;
+
+  extractRecentTopic(conversationHistory) {
+    const recentText = conversationHistory
+      .map((entry) => String(entry.content || '').toLowerCase())
+      .join(' ');
+
+    if (recentText.includes('sleep')) return 'sleep';
+    if (recentText.includes('stress')) return 'stress';
+    if (recentText.includes('exercise') || recentText.includes('workout')) return 'exercise';
+    if (recentText.includes('blood pressure') || recentText.includes('bp')) return 'bloodPressure';
+    if (recentText.includes('heart')) return 'heart';
+    return '';
   }
-  
-  adviceStress(context) {
-    const stressLevel = context.stressLevel;
-    
-    let response = `Your stress level is `;
-    
-    if (stressLevel <= 2) {
-      response += "low - that's wonderful! Keep up your stress management practices. Remember to maintain work-life balance and practice self-care regularly.";
-    } else if (stressLevel === 3) {
-      response += "moderate. While manageable, consider implementing more stress reduction techniques:\n\n• Daily meditation or deep breathing (10-15 min)\n• Regular exercise\n• Adequate sleep\n• Social connections\n• Time management\n• Hobbies and relaxation activities";
-    } else {
-      response += "high, which can impact your overall health. Priority actions:\n\n• Practice daily relaxation (meditation, yoga, deep breathing)\n• Exercise regularly - it's a natural stress reliever\n• Talk to someone (friend, family, or counselor)\n• Identify stress triggers and develop coping strategies\n• Ensure adequate sleep\n• Consider professional support if stress is overwhelming\n\nChronic stress affects physical health, so addressing it is crucial!";
-    }
-    
-    response += "\n\nWould you like specific stress management techniques?";
-    return response;
-  }
-  
-  improvementSuggestions(context) {
-    const scores = context.detailedScores;
-    const lowestScores = Object.entries(scores)
+
+  getLowestMetrics(context, count = 3) {
+    return Object.entries(context?.detailedScores || {})
       .sort((a, b) => a[1] - b[1])
-      .slice(0, 3);
-    
-    let response = "Based on your assessment, here are priority areas for improvement:\n\n";
-    
-    const metricAdvice = {
-      bmi: "Work on achieving healthy weight through balanced nutrition and regular exercise",
-      bloodPressure: "Focus on reducing sodium, increasing potassium-rich foods, and managing stress",
-      heartRate: "Regular cardiovascular exercise can help optimize your resting heart rate",
-      exercise: "Gradually increase physical activity - aim for 150 minutes of moderate exercise weekly",
-      sleep: "Prioritize 7-9 hours of quality sleep by maintaining consistent sleep schedule",
-      stress: "Implement daily stress management techniques like meditation, yoga, or deep breathing"
+      .slice(0, count);
+  }
+
+  getStrongestMetric(context) {
+    const scored = Object.entries(context?.detailedScores || {}).sort((a, b) => b[1] - a[1]);
+    return scored[0] || null;
+  }
+
+  getMetricLabel(metricKey) {
+    return this.metricLabels[metricKey] || metricKey;
+  }
+
+  shouldEncourageClinicalSupport(context) {
+    if (!context) {
+      return false;
+    }
+
+    return (
+      Number(context.overallScore || 0) < 50 ||
+      Number(context.systolic || 0) >= 140 ||
+      Number(context.diastolic || 0) >= 90 ||
+      Number(context.heartRate || 0) >= 95
+    );
+  }
+
+  summarizeAssessment(context) {
+    if (!context || !context.overallScore) {
+      return this.defaultResponse();
+    }
+
+    const weakestMetric = this.getLowestMetrics(context, 1)[0];
+    const strongestMetric = this.getStrongestMetric(context);
+    const score = Number(context.overallScore || 0);
+    const summary = [
+      `Your latest score is ${score}/100 and the overall rating is ${context.status}.`,
+      weakestMetric
+        ? `The clearest area to work on first is ${this.getMetricLabel(weakestMetric[0]).toLowerCase()}.`
+        : 'Your detailed metric breakdown is not available yet.',
+      strongestMetric
+        ? `One of your stronger signals right now is ${this.getMetricLabel(strongestMetric[0]).toLowerCase()}.`
+        : ''
+    ].filter(Boolean);
+
+    if (this.shouldEncourageClinicalSupport(context)) {
+      summary.push('Because at least one signal looks more strained, professional follow-up would be a sensible safety step.');
+    } else {
+      summary.push('This looks like a changeable profile, so consistent habit work should matter more than perfection.');
+    }
+
+    return {
+      response: `Here is the plain-language read:\n\n${summary.join('\n\n')}`,
+      followUpPrompts: [
+        'Which metric is holding my score back the most?',
+        'Create a 7-day improvement plan',
+        'Turn my results into a daily routine'
+      ]
     };
-    
-    lowestScores.forEach(([metric, score], index) => {
-      response += `${index + 1}. ${metric.toUpperCase()} (Score: ${Math.round(score)}/100)\n   ${metricAdvice[metric] || 'Consult with healthcare provider for personalized advice'}\n\n`;
-    });
-    
-    response += "Focus on one area at a time for sustainable improvement. Small, consistent changes lead to lasting results!\n\nWhich area would you like to work on first?";
-    return response;
+  }
+
+  explainPriorityMetric(context) {
+    if (!context || !context.overallScore) {
+      return this.defaultResponse();
+    }
+
+    const lowestScores = this.getLowestMetrics(context, 3);
+    const [topPriority] = lowestScores;
+
+    if (!topPriority) {
+      return this.summarizeAssessment(context);
+    }
+
+    const lines = [
+      `The top priority is ${this.getMetricLabel(topPriority[0])} at roughly ${Math.round(topPriority[1])}/100.`,
+      this.metricAdvice[topPriority[0]] || 'This is the clearest place to start improving first.',
+      'A good rule is to work on the weakest metric first, then support it with one adjacent habit so the change sticks better.'
+    ];
+
+    if (lowestScores[1]) {
+      lines.push(
+        `Right behind it is ${this.getMetricLabel(lowestScores[1][0]).toLowerCase()}, so those two areas likely reinforce each other.`
+      );
+    }
+
+    return {
+      response: `Here is where I would focus first:\n\n${lines.join('\n\n')}`,
+      followUpPrompts: [
+        `How do I improve my ${this.getMetricLabel(topPriority[0]).toLowerCase()}?`,
+        'Create a 7-day improvement plan',
+        'When should I talk to a doctor about these results?'
+      ]
+    };
+  }
+
+  buildActionPlan(context, conversationHistory) {
+    if (!context || !context.overallScore) {
+      return {
+        response:
+          'I can build a much better plan once you complete an assessment. After that, I can turn your score and weakest metrics into a daily or weekly routine.',
+        followUpPrompts: [
+          'Explain what a strong health score usually indicates',
+          'How much exercise should I aim for this week?',
+          'What does healthy sleep typically look like?'
+        ]
+      };
+    }
+
+    const score = Number(context.overallScore || 0);
+    const weakestMetrics = this.getLowestMetrics(context, 2);
+    const focusMetric = weakestMetrics[0]?.[0];
+    const planTitle =
+      score >= 85
+        ? '7-day maintenance plan'
+        : score >= 70
+          ? '7-day strengthening plan'
+          : score >= 50
+            ? '7-day recovery plan'
+            : '7-day priority support plan';
+
+    const dayPlan = [
+      'Day 1: Review your weakest metric and set one realistic target for the week.',
+      focusMetric === 'sleep'
+        ? 'Day 2: Lock in a consistent bedtime and wake time for the next 7 days.'
+        : focusMetric === 'exercise'
+          ? 'Day 2: Schedule two short movement blocks you know you can actually complete.'
+          : focusMetric === 'stress'
+            ? 'Day 2: Add one repeatable 5-10 minute stress reset to your day.'
+            : 'Day 2: Make the easiest healthy change you can repeat tomorrow.',
+      'Day 3: Reduce one obvious friction point such as poor timing, skipped meals, or an unrealistic routine.',
+      'Day 4: Repeat the plan even if motivation is low. Consistency matters more than intensity here.',
+      'Day 5: Check your sleep, stress, and movement together rather than treating them as separate issues.',
+      'Day 6: Notice what felt sustainable and keep that piece.',
+      'Day 7: Review the week and choose the one habit to carry into the next 7 days.'
+    ];
+
+    if (this.shouldEncourageClinicalSupport(context)) {
+      dayPlan.push('Safety step: If readings stay elevated or symptoms concern you, discuss them with a healthcare professional promptly.');
+    }
+
+    if (conversationHistory.some((entry) => String(entry.content || '').toLowerCase().includes('daily routine'))) {
+      dayPlan[0] = 'Day 1: Build your routine around the same wake time, meals, movement window, and bedtime.';
+    }
+
+    return {
+      response: `${planTitle}:\n\n${dayPlan.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+      followUpPrompts: [
+        'Turn this into a simpler daily checklist',
+        'Which metric should I measure again first?',
+        'How do I keep this plan realistic?'
+      ]
+    };
+  }
+
+  discussDoctorSupport(context) {
+    if (!context || !context.overallScore) {
+      return {
+        response:
+          'A clinician is especially useful when symptoms are new, readings stay abnormal, or your daily function is being affected. If you share your assessment results after checking in, I can help you frame the conversation more clearly.',
+        followUpPrompts: [
+          'What numbers should I keep an eye on?',
+          'What should I ask during a health appointment?',
+          'Summarize my latest assessment in simple language'
+        ]
+      };
+    }
+
+    const reasons = [];
+
+    if (Number(context.overallScore || 0) < 50) {
+      reasons.push('your overall score is in the needs-improvement range');
+    }
+    if (Number(context.systolic || 0) >= 140 || Number(context.diastolic || 0) >= 90) {
+      reasons.push(`your blood pressure reading is ${context.systolic}/${context.diastolic}`);
+    }
+    if (Number(context.heartRate || 0) >= 95) {
+      reasons.push(`your resting heart rate is ${context.heartRate} bpm`);
+    }
+
+    const recommendation = reasons.length
+      ? `Professional follow-up would be reasonable because ${reasons.join(', ')}.`
+      : 'Professional follow-up is optional here, but still useful if you want tailored advice or your symptoms do not match the score.';
+
+    return {
+      response:
+        `${recommendation}\n\nIf you book a visit, bring these points:\n\n1. Your latest score and status.\n2. Any home readings that are repeatedly elevated.\n3. Symptoms, timing, and how daily life is being affected.\n4. The one or two habits you have already tried to change.`,
+      followUpPrompts: [
+        'What should I ask during a health appointment?',
+        'Which metric is holding my score back the most?',
+        'Create a 7-day improvement plan'
+      ]
+    };
+  }
+
+  explainBMI(context) {
+    if (!context || typeof context.bmi !== 'number') {
+      return this.defaultResponse();
+    }
+
+    const bmi = context.bmi;
+    let category;
+    let advice;
+
+    if (bmi < 18.5) {
+      category = 'underweight';
+      advice = 'Aim for nutrient-dense meals, regular strength work, and professional guidance if weight loss was unintentional.';
+    } else if (bmi < 25) {
+      category = 'a generally healthy range';
+      advice = 'The main goal is protecting this range with consistent eating, movement, and sleep habits.';
+    } else if (bmi < 30) {
+      category = 'overweight';
+      advice = 'A modest reduction in weight can help blood pressure, heart health, and overall score at the same time.';
+    } else {
+      category = 'obese';
+      advice = 'This is a high-leverage area to improve, but the safest progress usually comes from steady changes rather than aggressive restriction.';
+    }
+
+    return {
+      response:
+        `Your BMI is ${bmi}, which sits in the ${category} category.\n\nWhat matters most is not chasing a perfect number, but improving the surrounding habits that influence energy, blood pressure, and long-term risk.\n\nBest next step: ${advice}`,
+      followUpPrompts: [
+        'Give me a simple nutrition plan',
+        'Create a weekly exercise plan',
+        'Which metric is holding my score back the most?'
+      ]
+    };
+  }
+
+  explainBloodPressure(context) {
+    if (!context) {
+      return this.defaultResponse();
+    }
+
+    const systolic = Number(context.systolic || 0);
+    const diastolic = Number(context.diastolic || 0);
+    let interpretation;
+
+    if (systolic < 120 && diastolic < 80) {
+      interpretation = 'This is in a healthy range for many adults.';
+    } else if (systolic < 130 && diastolic < 85) {
+      interpretation = 'This is slightly elevated and worth monitoring over time.';
+    } else if (systolic < 140 && diastolic < 90) {
+      interpretation = 'This suggests a mild elevation, so lifestyle consistency matters a lot here.';
+    } else {
+      interpretation = 'This is elevated enough that clinical follow-up would be a sensible next step.';
+    }
+
+    return {
+      response:
+        `Your blood pressure reading is ${systolic}/${diastolic} mmHg.\n\n${interpretation}\n\nThe biggest habit levers are:\n\n1. Lowering sodium and ultra-processed foods.\n2. Staying active most days of the week.\n3. Protecting sleep and recovery.\n4. Rechecking readings consistently rather than relying on a single measurement.`,
+      followUpPrompts: [
+        'Which foods support healthy blood pressure?',
+        'When should I talk to a doctor about these results?',
+        'Create a 7-day improvement plan'
+      ]
+    };
+  }
+
+  explainHeartRate(context) {
+    if (!context) {
+      return this.defaultResponse();
+    }
+
+    const heartRate = Number(context.heartRate || 0);
+    let interpretation;
+
+    if (heartRate <= 70) {
+      interpretation = 'That is often a reassuring resting value, especially if you feel well.';
+    } else if (heartRate <= 85) {
+      interpretation = 'That is a workable range, though better recovery and conditioning may still help.';
+    } else {
+      interpretation = 'That is high enough to pay attention to, especially if it stays elevated or symptoms are present.';
+    }
+
+    return {
+      response:
+        `Your resting heart rate is ${heartRate} bpm.\n\n${interpretation}\n\nWhat often helps most:\n\n1. More consistent aerobic conditioning.\n2. Better sleep and hydration.\n3. Lower stimulant load if relevant.\n4. Stress reduction that you can repeat daily.`,
+      followUpPrompts: [
+        'How much cardio do I need?',
+        'Give me a 5-minute stress reset',
+        'Create a weekly exercise plan'
+      ]
+    };
+  }
+
+  adviceExercise(context) {
+    if (!context) {
+      return this.defaultResponse();
+    }
+
+    const exerciseHours = Number(context.exerciseHours || 0);
+    let opening;
+
+    if (exerciseHours >= 5) {
+      opening = 'You are already building a strong movement base.';
+    } else if (exerciseHours >= 3) {
+      opening = 'You are in a decent range, but a little more consistency could move other metrics too.';
+    } else if (exerciseHours >= 1) {
+      opening = 'You have a starting point, which is more important than perfection.';
+    } else {
+      opening = 'This looks like the easiest high-impact area to improve first.';
+    }
+
+    return {
+      response:
+        `You are currently logging about ${exerciseHours} hours of exercise per week.\n\n${opening}\n\nA realistic target:\n\n1. Aim for 150 minutes of moderate activity across the week.\n2. Add 2 short strength sessions if possible.\n3. Keep the first version small enough that you can repeat it next week.`,
+      followUpPrompts: [
+        'Build me a beginner weekly exercise plan',
+        'What if I only have 20 minutes a day?',
+        'Turn my results into a daily routine'
+      ]
+    };
+  }
+
+  adviceSleep(context) {
+    if (!context) {
+      return this.defaultResponse();
+    }
+
+    const sleepHours = Number(context.sleepHours || 0);
+    let interpretation;
+
+    if (sleepHours >= 7 && sleepHours <= 9) {
+      interpretation = 'That is within the usual recovery sweet spot for many adults.';
+    } else if (sleepHours < 7) {
+      interpretation = 'This is below the usual recovery target, so sleep may be dragging other metrics down too.';
+    } else {
+      interpretation = 'This is above the usual target range, so sleep quality and daytime energy are worth noticing too.';
+    }
+
+    return {
+      response:
+        `You are averaging about ${sleepHours} hours of sleep per night.\n\n${interpretation}\n\nThe highest-value sleep moves are:\n\n1. Keep the same wake time most days.\n2. Reduce screens and stimulation before bed.\n3. Avoid heavy meals or caffeine too late.\n4. Treat sleep as a schedule, not an afterthought.`,
+      followUpPrompts: [
+        'What bedtime habits help most?',
+        'How many hours should I target each night?',
+        'Create a 7-day improvement plan'
+      ]
+    };
+  }
+
+  adviceStress(context) {
+    if (!context) {
+      return this.defaultResponse();
+    }
+
+    const stressLevel = Number(context.stressLevel || 0);
+    let interpretation;
+
+    if (stressLevel <= 2) {
+      interpretation = 'Stress looks reasonably controlled right now.';
+    } else if (stressLevel === 3) {
+      interpretation = 'Stress is present but still looks workable if you build a repeatable reset habit.';
+    } else {
+      interpretation = 'Stress is likely affecting both recovery and decision-making, so it deserves direct attention.';
+    }
+
+    return {
+      response:
+        `Your reported stress level is ${stressLevel}/5.\n\n${interpretation}\n\nA practical reset stack:\n\n1. One short breathing or walking break during the day.\n2. One clear work-stop time in the evening.\n3. One calming routine before bed.\n4. One person or place you use for support instead of pushing through alone.`,
+      followUpPrompts: [
+        'Give me a 5-minute stress reset',
+        'How can I lower stress during work?',
+        'What are signs my stress is too high?'
+      ]
+    };
+  }
+
+  adviceNutrition(context) {
+    const hasContext = Boolean(context && context.overallScore);
+    const weakestMetric = hasContext ? this.getLowestMetrics(context, 1)[0] : null;
+    const nutritionAngle =
+      weakestMetric?.[0] === 'bloodPressure'
+        ? 'Focus especially on sodium reduction, potassium-rich foods, and fewer heavily processed meals.'
+        : weakestMetric?.[0] === 'bmi'
+          ? 'Focus on meal consistency, protein, fiber, and portions you can sustain without extremes.'
+          : 'Focus on a simple plate pattern: protein, produce, whole-food carbohydrates, and hydration.';
+
+    return {
+      response:
+        `A strong nutrition baseline does not need to be complicated.\n\n1. Eat more minimally processed foods most days.\n2. Build meals around protein and produce first.\n3. Keep sugary drinks and high-sodium convenience foods occasional.\n4. Use consistency more than restriction.\n\n${nutritionAngle}`,
+      followUpPrompts: [
+        'Give me a simple daily meal structure',
+        'Which foods support healthy blood pressure?',
+        'Create a 7-day improvement plan'
+      ]
+    };
+  }
+
+  defaultResponse(context) {
+    if (context && context.overallScore) {
+      return {
+        response:
+          'I can help most with your latest assessment. Ask me to summarize it, identify the weakest metric, build a 7-day plan, or explain one specific area like sleep, stress, blood pressure, exercise, or weight.',
+        followUpPrompts: [
+          'Summarize my latest assessment in simple language',
+          'Which metric is holding my score back the most?',
+          'Create a 7-day improvement plan'
+        ]
+      };
+    }
+
+    return {
+      response:
+        'I can explain health basics, but the assistant becomes much more useful after an assessment because it can personalize the advice. In the meantime, ask about sleep, exercise, stress, nutrition, or how the scoring works.',
+      followUpPrompts: [
+        'Explain what a strong health score usually indicates',
+        'How much exercise should I aim for this week?',
+        'What does healthy sleep typically look like?'
+      ]
+    };
   }
 }
 
@@ -766,7 +1127,7 @@ const chatAgent = new HealthChatAgent();
 // API endpoint for AI chat
 app.post('/api/chat', (req, res) => {
   try {
-    const { message, context } = req.body || {};
+    const { message, context, history } = req.body || {};
     const trimmedMessage = String(message || '').trim();
 
     if (!trimmedMessage) {
@@ -778,9 +1139,19 @@ app.post('/api/chat', (req, res) => {
     }
 
     const safeContext = isPlainObject(context) ? context : {};
-    const response = chatAgent.generateResponse(trimmedMessage, safeContext);
+    const safeHistory = Array.isArray(history)
+      ? history
+          .filter(isPlainObject)
+          .map((entry) => ({
+            role: String(entry.role || '').slice(0, 40),
+            content: String(entry.content || '').slice(0, MAX_CHAT_MESSAGE_LENGTH)
+          }))
+          .filter((entry) => entry.role && entry.content)
+          .slice(-8)
+      : [];
+    const reply = chatAgent.generateReply(trimmedMessage, safeContext, safeHistory);
 
-    res.json({ response });
+    res.json(reply);
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ 

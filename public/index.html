@@ -30,7 +30,7 @@
     </button>
 
     <!-- Health Chat Panel -->
-    <div id="aiChatPanel" class="ai-chat-panel">
+        <div id="aiChatPanel" class="ai-chat-panel">
         <div class="chat-header">
             <div class="chat-header-content">
                 <div class="chat-avatar">
@@ -42,9 +42,15 @@
                     <p id="chatHeaderHint" class="chat-header-hint">Ask about your score, sleep, exercise, or next best step.</p>
                 </div>
             </div>
-            <button id="closeChatBtn" class="close-chat-btn">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="chat-header-actions">
+                <button id="resetChatBtn" class="chat-reset-btn" type="button" aria-label="Reset chat conversation">
+                    <i class="fas fa-rotate-left"></i>
+                    New chat
+                </button>
+                <button id="closeChatBtn" class="close-chat-btn" type="button" aria-label="Close health assistant chat">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
         </div>
         <div class="chat-context-strip">
             <div class="chat-context-card">

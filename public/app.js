@@ -1165,6 +1165,7 @@ function resetForm() {
 const aiChatBtn = document.getElementById('aiChatBtn');
 const aiChatPanel = document.getElementById('aiChatPanel');
 const closeChatBtn = document.getElementById('closeChatBtn');
+const resetChatBtn = document.getElementById('resetChatBtn');
 const chatInput = document.getElementById('chatInput');
 const sendChatBtn = document.getElementById('sendChatBtn');
 const chatMessages = document.getElementById('chatMessages');
@@ -1183,6 +1184,81 @@ const DEFAULT_CHAT_SUGGESTIONS = [
     'How much exercise should I aim for this week?',
     'What does healthy sleep typically look like?'
 ];
+const CHAT_WELCOME_MESSAGE = 'Hello! I am your Health Assistant. I can explain your results in plain language, build a practical plan, and help you decide what to focus on first.';
+const chatState = {
+    conversation: [],
+    lastSuggestedPrompts: DEFAULT_CHAT_SUGGESTIONS
+};
+
+function rememberChatTurn(role, content) {
+    chatState.conversation.push({
+        role,
+        content: String(content || '').trim()
+    });
+    chatState.conversation = chatState.conversation
+        .filter((entry) => entry.content)
+        .slice(-8);
+}
+
+function renderMessageBody(container, text) {
+    const lines = String(text || '').split(/\r?\n/);
+    let listElement = null;
+
+    const flushList = () => {
+        if (listElement) {
+            container.appendChild(listElement);
+            listElement = null;
+        }
+    };
+
+    lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+
+        if (!line) {
+            flushList();
+            return;
+        }
+
+        if (/^(?:[-*•]|\d+\.)\s+/.test(line)) {
+            if (!listElement) {
+                listElement = document.createElement('ul');
+                listElement.className = 'message-list';
+            }
+
+            const item = document.createElement('li');
+            item.textContent = line.replace(/^(?:[-*•]|\d+\.)\s+/, '');
+            listElement.appendChild(item);
+            return;
+        }
+
+        flushList();
+        const paragraph = document.createElement('p');
+        paragraph.textContent = line;
+        container.appendChild(paragraph);
+    });
+
+    flushList();
+}
+
+function resetChatConversation(showToast = false) {
+    chatState.conversation = [];
+    chatState.lastSuggestedPrompts = DEFAULT_CHAT_SUGGESTIONS;
+
+    if (chatMessages) {
+        chatMessages.innerHTML = '';
+        addMessage(CHAT_WELCOME_MESSAGE, 'bot', {
+            badgeLabel: 'Assistant ready',
+            trackInHistory: false,
+            keyResponse: false
+        });
+    }
+
+    updateChatExperience('', DEFAULT_CHAT_SUGGESTIONS);
+
+    if (showToast) {
+        showNotification('Health Assistant reset. Start a fresh conversation anytime.', 'success');
+    }
+}
 
 function openChatPanel(source, prefillMessage = '') {
     aiChatPanel.classList.add('active');
@@ -1377,11 +1453,15 @@ function renderChatSuggestions(prompts) {
     });
 }
 
-function updateChatExperience(lastMessage = '') {
+function updateChatExperience(lastMessage = '', promptsOverride = null) {
     updateChatHeader();
     updateChatContextPanel(lastMessage);
     updateChatComposerHint(lastMessage);
-    renderChatSuggestions(buildFollowUpSuggestions(lastMessage));
+    const prompts = Array.isArray(promptsOverride) && promptsOverride.length
+        ? promptsOverride
+        : buildFollowUpSuggestions(lastMessage);
+    chatState.lastSuggestedPrompts = prompts;
+    renderChatSuggestions(prompts);
 }
 
 // Toggle chat panel
@@ -1392,6 +1472,17 @@ aiChatBtn.addEventListener('click', () => {
 closeChatBtn.addEventListener('click', () => {
     closeChatPanel();
 });
+
+if (resetChatBtn) {
+    resetChatBtn.addEventListener('click', () => {
+        resetChatConversation(true);
+        if (chatInput) {
+            chatInput.value = '';
+            updateChatComposerHint();
+            chatInput.focus();
+        }
+    });
+}
 
 // Open chat from results page
 if (askAiBtn) {
@@ -1671,7 +1762,8 @@ async function sendMessage(forcedMessage = '', source = 'typed_input') {
             },
             body: JSON.stringify({
                 message: message,
-                context: currentAssessmentData
+                context: currentAssessmentData,
+                history: chatState.conversation
             })
         });
         
@@ -1686,7 +1778,7 @@ async function sendMessage(forcedMessage = '', source = 'typed_input') {
         
         // Add bot response
         addMessage(data.response, 'bot');
-        updateChatExperience(message);
+        updateChatExperience(message, data.followUpPrompts);
         
     } catch (error) {
         console.error('Chat error:', error);
@@ -1696,7 +1788,7 @@ async function sendMessage(forcedMessage = '', source = 'typed_input') {
     }
 }
 
-function addMessage(text, sender) {
+function addMessage(text, sender, options = {}) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}-message`;
 
@@ -1705,7 +1797,8 @@ function addMessage(text, sender) {
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    if (sender === 'bot' && currentAssessmentData) {
+    const shouldHighlight = options.keyResponse !== false && sender === 'bot' && currentAssessmentData;
+    if (shouldHighlight) {
         contentDiv.classList.add('is-key-response');
     }
 
@@ -1715,8 +1808,9 @@ function addMessage(text, sender) {
         ? '<i class="fas fa-sparkles"></i> Health Assistant'
         : '<i class="fas fa-user"></i> You';
 
-    const textParagraph = document.createElement('p');
-    textParagraph.textContent = text;
+    const messageBody = document.createElement('div');
+    messageBody.className = 'message-body';
+    renderMessageBody(messageBody, text);
 
     const timeSpan = document.createElement('span');
     timeSpan.className = 'message-time';
@@ -1727,12 +1821,16 @@ function addMessage(text, sender) {
 
     const badge = document.createElement('span');
     badge.className = 'message-badge';
-    badge.innerHTML = sender === 'bot'
-        ? '<i class="fas fa-notes-medical"></i> Guided response'
-        : '<i class="fas fa-pen"></i> Your question';
+    if (options.badgeLabel) {
+        badge.textContent = options.badgeLabel;
+    } else {
+        badge.innerHTML = sender === 'bot'
+            ? '<i class="fas fa-notes-medical"></i> Guided response'
+            : '<i class="fas fa-pen"></i> Your question';
+    }
 
     contentDiv.appendChild(messageTag);
-    contentDiv.appendChild(textParagraph);
+    contentDiv.appendChild(messageBody);
     metaRow.appendChild(badge);
     metaRow.appendChild(timeSpan);
     contentDiv.appendChild(metaRow);
@@ -1740,6 +1838,10 @@ function addMessage(text, sender) {
 
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    if (options.trackInHistory !== false) {
+        rememberChatTurn(sender === 'bot' ? 'assistant' : 'user', text);
+    }
 
     return messageDiv;
 }
@@ -1871,7 +1973,7 @@ window.addEventListener('load', () => {
         path: window.location.pathname
     });
 
-    updateChatExperience();
+    resetChatConversation(false);
     initializeFormExperience();
 
     const savedDraft = getFormDraft();
