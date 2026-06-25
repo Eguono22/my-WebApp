@@ -38,6 +38,11 @@ jobs:
           curl --fail --silent --show-error "$PRODUCTION_URL/api/health" --output health.json
           node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('health.json','utf8')); if (!data.ok) throw new Error('Health endpoint did not return ok=true.'); if (data.storage !== 'postgres') throw new Error('Expected postgres storage in production.');"
 
+      - name: Verify production readiness endpoint
+        run: |
+          curl --fail --silent --show-error "$PRODUCTION_URL/api/readiness" --output readiness.json
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('readiness.json','utf8')); if (!data.ok) throw new Error('Readiness endpoint did not return ok=true.'); if (!data.readiness || data.readiness.ready !== true) throw new Error('Production readiness check did not report ready=true.'); const checks=Array.isArray(data.readiness.checks)?data.readiness.checks:[]; const missing=checks.filter((check)=>check.required && !check.ok).map((check)=>check.name); if (missing.length) throw new Error(`Required readiness checks failed: ${missing.join(', ')}`);"
+
       - name: Verify analytics page requires authentication
         run: |
           status_code=$(curl --silent --show-error --output analytics.html --write-out "%{http_code}" "$PRODUCTION_URL/analytics.html")

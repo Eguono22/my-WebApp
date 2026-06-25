@@ -184,6 +184,76 @@ function getAnalyticsAdminPassword() {
   return String(process.env.ANALYTICS_ADMIN_PASSWORD || '').trim();
 }
 
+function isVercelDeployment() {
+  return String(process.env.VERCEL || '').trim() === '1';
+}
+
+function buildReadinessReport(storageLabel) {
+  const analyticsPasswordConfigured = Boolean(getAnalyticsAdminPassword());
+  const databaseUrlConfigured = Boolean(String(process.env.DATABASE_URL || '').trim());
+  const vercelDeployment = isVercelDeployment();
+  const checks = [
+    {
+      name: 'storage_initialized',
+      ok: Boolean(storageLabel),
+      required: true,
+      detail: storageLabel ? `Storage backend: ${storageLabel}` : 'Storage backend unavailable.'
+    },
+    {
+      name: 'analytics_admin_password',
+      ok: analyticsPasswordConfigured,
+      required: true,
+      detail: analyticsPasswordConfigured
+        ? 'Analytics admin password is configured.'
+        : 'Set ANALYTICS_ADMIN_PASSWORD to protect analytics and admin endpoints.'
+    },
+    {
+      name: 'durable_storage',
+      ok: !vercelDeployment || databaseUrlConfigured,
+      required: vercelDeployment,
+      detail: vercelDeployment
+        ? databaseUrlConfigured
+          ? 'DATABASE_URL is configured for durable deployed storage.'
+          : 'Set DATABASE_URL for durable storage on Vercel deployments.'
+        : 'Durable cloud storage is optional outside deployed Vercel environments.'
+    },
+    {
+      name: 'postgres_storage_in_vercel',
+      ok: !vercelDeployment || storageLabel === 'postgres',
+      required: vercelDeployment,
+      detail: vercelDeployment
+        ? storageLabel === 'postgres'
+          ? 'Production storage is using Postgres as expected.'
+          : `Expected postgres storage on Vercel, received ${storageLabel || 'unknown'}.`
+        : 'Postgres is recommended for deployment and optional for local development.'
+    }
+  ];
+
+  return {
+    ready: checks.every((check) => check.ok || !check.required),
+    environment: {
+      node: process.version,
+      nodeMajor: Number(process.versions?.node?.split?.('.')[0] || 0),
+      vercel: vercelDeployment,
+      nodeEnv: String(process.env.NODE_ENV || 'development')
+    },
+    checks
+  };
+}
+
+async function getHealthPayload() {
+  const storage = await getStorage();
+  const storageLabel = storage.label || 'unknown';
+  const readiness = buildReadinessReport(storageLabel);
+
+  return {
+    ok: true,
+    storage: storageLabel,
+    timestamp: new Date().toISOString(),
+    readiness
+  };
+}
+
 function sendAnalyticsAuthResponse(req, res, statusCode, message) {
   if (String(req.originalUrl || '').startsWith('/api/')) {
     return res.status(statusCode).json({ error: message });
@@ -258,15 +328,41 @@ app.use(express.static('public'));
 
 app.get('/api/health', async (req, res) => {
   try {
-    const storage = await getStorage();
-    return res.json({
-      ok: true,
-      storage: storage.label || 'unknown',
-      timestamp: new Date().toISOString()
-    });
+    return res.json(await getHealthPayload());
   } catch (error) {
     console.error('Health check error:', error);
     return res.status(500).json({ ok: false, error: 'Storage initialization failed' });
+  }
+});
+
+app.get('/api/readiness', async (req, res) => {
+  try {
+    const payload = await getHealthPayload();
+    return res.status(payload.readiness.ready ? 200 : 503).json(payload);
+  } catch (error) {
+    console.error('Readiness check error:', error);
+    return res.status(503).json({
+      ok: false,
+      ready: false,
+      error: 'Storage initialization failed',
+      readiness: {
+        ready: false,
+        environment: {
+          node: process.version,
+          nodeMajor: Number(process.versions?.node?.split?.('.')[0] || 0),
+          vercel: isVercelDeployment(),
+          nodeEnv: String(process.env.NODE_ENV || 'development')
+        },
+        checks: [
+          {
+            name: 'storage_initialized',
+            ok: false,
+            required: true,
+            detail: 'Storage initialization failed.'
+          }
+        ]
+      }
+    });
   }
 });
 

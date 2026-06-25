@@ -79,6 +79,21 @@ async function run() {
         assert.equal(health.response.status, 200, 'Health endpoint should return 200.');
         assert.equal(health.json?.ok, true, 'Health endpoint should report ok.');
         assert.equal(typeof health.json?.storage, 'string', 'Health endpoint should report storage type.');
+        assert.equal(
+            health.json?.readiness?.ready,
+            true,
+            'Health endpoint should report readiness success in local verification.'
+        );
+
+        const readiness = await fetchJson(`${BASE_URL}/api/readiness`);
+        assert.equal(readiness.response.status, 200, 'Readiness endpoint should return 200 locally.');
+        assert.equal(readiness.json?.ok, true, 'Readiness endpoint should report ok.');
+        assert.equal(readiness.json?.readiness?.ready, true, 'Readiness endpoint should report ready.');
+        assert.equal(
+            Array.isArray(readiness.json?.readiness?.checks),
+            true,
+            'Readiness endpoint should return detailed checks.'
+        );
 
         const doctorDirectory = await fetchJson(`${BASE_URL}/api/doctors/nigeria?limit=5&pages=1`);
         assert.equal(

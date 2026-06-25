@@ -124,8 +124,11 @@ The application uses a weighted scoring algorithm that:
 After deployment, verify:
 
 - `/api/health` returns `ok: true`
+- `/api/readiness` returns HTTP `200` with `readiness.ready: true`
 - `/analytics.html` prompts for Basic Auth and loads with `admin` plus `ANALYTICS_ADMIN_PASSWORD`
 - sync save/load and admin export/restore work against Postgres-backed storage
+
+The readiness endpoint reports whether production-only requirements are met, including analytics auth configuration and durable Postgres-backed storage on Vercel.
 
 ## Analytics
 
