@@ -58,7 +58,7 @@ DATABASE_URL=postgres://...
 ```
 
 - `ANALYTICS_ADMIN_PASSWORD`: Required to access `/analytics.html`, `/api/analytics/summary`, and admin export/restore endpoints
-- `DATABASE_URL`: Recommended for durable production storage; if omitted locally, the app falls back to SQLite in `data/syncedHistory.db`
+- `DATABASE_URL`: Recommended for durable production storage; if omitted locally, the app falls back to SQLite in `data/syncedHistory.db` on Node 22 or JSON storage in `data/storage-fallback.json` on older runtimes
 
 See `.env.example` for the tracked template.
 
@@ -106,6 +106,7 @@ The application uses a weighted scoring algorithm that:
 - Assessment history is stored in the browser for progress tracking.
 - If a user chooses to use the sync feature, history and goal data are stored server-side and linked to a Profile ID.
 - The app supports `DATABASE_URL` for managed Postgres storage in production and falls back to local SQLite when `DATABASE_URL` is not set.
+- On runtimes where `node:sqlite` is unavailable, the app automatically falls back to `data/storage-fallback.json` instead of failing at startup.
 - For Vercel production, connect a managed Postgres database so sync and analytics data remain durable across deployments and instances.
 
 ## Deploying To Vercel
