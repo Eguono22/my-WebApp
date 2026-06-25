@@ -15,10 +15,15 @@
     <meta name="twitter:title" content="Health Assessment Hub">
     <meta name="twitter:description" content="Review your wellness metrics, track progress over time, and get practical health guidance.">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <div id="notificationStack" class="notification-stack" aria-live="polite" aria-atomic="true"></div>
+
     <!-- Health Chat Button -->
     <button id="aiChatBtn" class="ai-chat-toggle" title="Chat with the Health Assistant" aria-label="Open health assistant chat">
         <i class="fas fa-robot"></i>
@@ -41,6 +46,23 @@
                 <i class="fas fa-times"></i>
             </button>
         </div>
+        <div class="chat-context-strip">
+            <div class="chat-context-card">
+                <span class="chat-context-label">Session focus</span>
+                <strong id="chatContextTitle">General wellness guidance</strong>
+                <p id="chatContextSummary">Ask for a simple explanation, a weekly plan, or help understanding your results.</p>
+            </div>
+            <div class="chat-context-mini-grid">
+                <article class="chat-mini-card">
+                    <span class="chat-context-label">Latest score</span>
+                    <strong id="chatContextScore">No score yet</strong>
+                </article>
+                <article class="chat-mini-card">
+                    <span class="chat-context-label">Best prompt</span>
+                    <strong id="chatContextPrompt">Ask what to improve first</strong>
+                </article>
+            </div>
+        </div>
         <div class="chat-suggestion-panel">
             <p class="chat-suggestion-label">Suggested prompts</p>
             <div id="chatSuggestions" class="chat-suggestions" aria-label="Suggested prompts"></div>
@@ -56,8 +78,8 @@
         </div>
         <div class="chat-input-container">
             <div class="chat-input-shell">
-                <input type="text" id="chatInput" placeholder="Ask me anything about your health..." autocomplete="off">
-                <p id="chatInputHint" class="chat-input-hint">You can ask for a plan, explanation, or a simple wellness tip.</p>
+                <input type="text" id="chatInput" placeholder="Ask about your results, risks, or next steps..." autocomplete="off">
+                <p id="chatInputHint" class="chat-input-hint">Ask for an explanation, a structured plan, or a practical follow-up question.</p>
             </div>
             <button id="sendChatBtn">
                 <i class="fas fa-paper-plane"></i>
@@ -67,161 +89,261 @@
 
     <div class="container">
         <header>
-            <div class="header-content">
-                <i class="fas fa-heartbeat header-icon"></i>
-                <h1>Health Assessment Hub</h1>
-                <p class="subtitle">Review key wellness metrics, track progress, and get practical health guidance.</p>
+            <div class="header-content hero-grid">
+                <div class="hero-copy">
+                    <p class="hero-eyebrow">AI-guided wellness review</p>
+                    <h1>Health Assessment Hub</h1>
+                    <p class="subtitle">A structured wellness review that helps you interpret core health signals, understand your current profile, and decide on sensible next steps.</p>
+                    <div class="hero-trust-row">
+                        <div class="hero-trust-pill">
+                            <i class="fas fa-wave-square"></i>
+                            Structured clinical-style scoring
+                        </div>
+                        <div class="hero-trust-pill">
+                            <i class="fas fa-user-shield"></i>
+                            Private by default
+                        </div>
+                        <div class="hero-trust-pill">
+                            <i class="fas fa-message-medical"></i>
+                            Guided follow-up support
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-panel">
+                    <div class="hero-panel-head">
+                        <span class="hero-panel-kicker">Assessment Summary</span>
+                        <span class="hero-panel-badge">Under 1 minute</span>
+                    </div>
+                    <div class="hero-metric-grid">
+                        <article class="hero-metric-card">
+                            <span class="hero-metric-label">Metrics reviewed</span>
+                            <strong>9</strong>
+                            <p>Core vitals, blood pressure, recovery, and lifestyle measures.</p>
+                        </article>
+                        <article class="hero-metric-card">
+                            <span class="hero-metric-label">Output</span>
+                            <strong>Score + guidance</strong>
+                            <p>Clear scoring, practical recommendations, and follow-up guidance.</p>
+                        </article>
+                    </div>
+                    <div class="hero-panel-foot">
+                        <i class="fas fa-shield-heart"></i>
+                        Educational wellness guidance only, not a medical diagnosis.
+                    </div>
+                </div>
             </div>
         </header>
 
         <div class="main-content">
-            <div class="form-section">
-                <div class="section-header">
-                    <i class="fas fa-clipboard-list"></i>
-                    <div>
-                        <h2>Enter Your Health Information</h2>
-                        <p class="form-intro">Most people finish this check in under a minute. Start with an example or continue where you left off.</p>
+            <div class="assessment-workspace">
+                <div class="form-section surface-card">
+                    <div class="section-header">
+                        <i class="fas fa-clipboard-list"></i>
+                        <div>
+                            <p class="section-kicker">Assessment Intake</p>
+                            <h2>Enter Your Health Information</h2>
+                            <p class="form-intro">Most people complete this review in under a minute. You can start with sample data or continue from your saved draft.</p>
+                        </div>
                     </div>
-                </div>
-                <form id="healthForm">
-                    <div class="form-onboarding-card">
-                        <div class="form-onboarding-header">
-                            <div>
-                                <p class="form-progress-label">Assessment Progress</p>
-                                <strong id="formProgressText" aria-live="polite">0 of 9 fields completed</strong>
+                    <form id="healthForm">
+                        <div class="form-onboarding-card">
+                            <div class="form-onboarding-header">
+                                <div>
+                                    <p class="form-progress-label">Assessment Progress</p>
+                                    <strong id="formProgressText" aria-live="polite">0 of 9 fields completed</strong>
+                                </div>
+                                <div class="form-progress-pill" id="formProgressPill">0%</div>
                             </div>
-                            <div class="form-progress-pill" id="formProgressPill">0%</div>
-                        </div>
-                        <div class="form-progress-track">
-                            <div id="formProgressBar" class="form-progress-bar"></div>
-                        </div>
-                        <div class="form-quick-actions">
-                            <button id="useExampleBtn" class="btn-secondary-action" type="button" aria-label="Fill the form with example health data">
-                                <i class="fas fa-wand-magic-sparkles"></i>
-                                Use Example Data
-                            </button>
-                            <button id="clearDraftBtn" class="btn-secondary-action" type="button" aria-label="Clear the current draft health form">
-                                <i class="fas fa-eraser"></i>
-                                Clear Draft
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="age">
-                                <i class="fas fa-calendar"></i>
-                                Age (years)
-                            </label>
-                            <input type="number" id="age" name="age" min="1" max="120" placeholder="e.g. 34" required>
+                            <div class="form-progress-track">
+                                <div id="formProgressBar" class="form-progress-bar"></div>
+                            </div>
+                            <div class="form-quick-actions">
+                                <button id="useExampleBtn" class="btn-secondary-action" type="button" aria-label="Fill the form with example health data">
+                                    <i class="fas fa-wand-magic-sparkles"></i>
+                                    Load Sample Data
+                                </button>
+                                <button id="clearDraftBtn" class="btn-secondary-action" type="button" aria-label="Clear the current draft health form">
+                                    <i class="fas fa-eraser"></i>
+                                    Clear Draft
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="weight">
-                                <i class="fas fa-weight"></i>
-                                Weight (kg)
-                            </label>
-                            <input type="number" id="weight" name="weight" min="20" max="300" step="0.1" placeholder="e.g. 72.5" required>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="age">
+                                    <i class="fas fa-calendar"></i>
+                                    Age (years)
+                                </label>
+                                <input type="number" id="age" name="age" min="1" max="120" placeholder="e.g. 34" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="weight">
+                                    <i class="fas fa-weight"></i>
+                                    Weight (kg)
+                                </label>
+                                <input type="number" id="weight" name="weight" min="20" max="300" step="0.1" placeholder="e.g. 72.5" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="height">
+                                    <i class="fas fa-ruler-vertical"></i>
+                                    Height (cm)
+                                </label>
+                                <input type="number" id="height" name="height" min="100" max="250" placeholder="e.g. 175" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="heartRate">
+                                    <i class="fas fa-heartbeat"></i>
+                                    Resting Heart Rate (bpm)
+                                </label>
+                                <input type="number" id="heartRate" name="heartRate" min="40" max="200" placeholder="e.g. 64" required>
+                                <p class="form-help">Use your resting number, ideally measured while calm or shortly after waking.</p>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="height">
-                                <i class="fas fa-ruler-vertical"></i>
-                                Height (cm)
-                            </label>
-                            <input type="number" id="height" name="height" min="100" max="250" placeholder="e.g. 175" required>
+                        <div class="form-section-divider">
+                            <span>Blood Pressure</span>
                         </div>
 
-                        <div class="form-group">
-                            <label for="heartRate">
-                                <i class="fas fa-heartbeat"></i>
-                                Resting Heart Rate (bpm)
-                            </label>
-                            <input type="number" id="heartRate" name="heartRate" min="40" max="200" placeholder="e.g. 64" required>
-                            <p class="form-help">Use your resting number, ideally measured while calm or shortly after waking.</p>
-                        </div>
-                    </div>
-
-                    <div class="form-section-divider">
-                        <span>Blood Pressure</span>
-                    </div>
-
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label for="systolic">
-                                <i class="fas fa-tachometer-alt"></i>
-                                Systolic (mmHg)
-                            </label>
-                            <input type="number" id="systolic" name="systolic" min="70" max="200" placeholder="e.g. 118" required>
-                            <p class="form-help">Top blood pressure number.</p>
-                        </div>
-                        <div class="form-group">
-                            <label for="diastolic">
-                                <i class="fas fa-tachometer-alt"></i>
-                                Diastolic (mmHg)
-                            </label>
-                            <input type="number" id="diastolic" name="diastolic" min="40" max="130" placeholder="e.g. 76" required>
-                            <p class="form-help">Bottom blood pressure number.</p>
-                        </div>
-                    </div>
-
-                    <div class="form-section-divider">
-                        <span>Lifestyle Metrics</span>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="exerciseHours">
-                                <i class="fas fa-running"></i>
-                                Exercise (hours/week)
-                            </label>
-                            <input type="number" id="exerciseHours" name="exerciseHours" min="0" max="40" step="0.5" placeholder="e.g. 4" required>
-                            <p class="form-help">Count walking, gym sessions, sports, or other intentional exercise.</p>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label for="systolic">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    Systolic (mmHg)
+                                </label>
+                                <input type="number" id="systolic" name="systolic" min="70" max="200" placeholder="e.g. 118" required>
+                                <p class="form-help">Top blood pressure number.</p>
+                            </div>
+                            <div class="form-group">
+                                <label for="diastolic">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    Diastolic (mmHg)
+                                </label>
+                                <input type="number" id="diastolic" name="diastolic" min="40" max="130" placeholder="e.g. 76" required>
+                                <p class="form-help">Bottom blood pressure number.</p>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="sleepHours">
-                                <i class="fas fa-bed"></i>
-                                Sleep (hours/night)
-                            </label>
-                            <input type="number" id="sleepHours" name="sleepHours" min="0" max="24" step="0.5" placeholder="e.g. 7.5" required>
-                            <p class="form-help">Use your average night over the last week.</p>
+                        <div class="form-section-divider">
+                            <span>Lifestyle Metrics</span>
                         </div>
 
-                        <div class="form-group span-2">
-                            <label for="stressLevel">
-                                <i class="fas fa-brain"></i>
-                                Stress Level
-                            </label>
-                            <select id="stressLevel" name="stressLevel" required>
-                                <option value="">Select stress level</option>
-                                <option value="1">😊 Very Low - Feeling relaxed and calm</option>
-                                <option value="2">🙂 Low - Minimal stress</option>
-                                <option value="3">😐 Moderate - Manageable stress</option>
-                                <option value="4">😟 High - Feeling stressed</option>
-                                <option value="5">😰 Very High - Overwhelming stress</option>
-                            </select>
-                            <p class="form-help">Pick the option that best matches how you have felt most days this week.</p>
-                        </div>
-                    </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="exerciseHours">
+                                    <i class="fas fa-running"></i>
+                                    Exercise (hours/week)
+                                </label>
+                                <input type="number" id="exerciseHours" name="exerciseHours" min="0" max="40" step="0.5" placeholder="e.g. 4" required>
+                                <p class="form-help">Count walking, gym sessions, sports, or other intentional exercise.</p>
+                            </div>
 
-                    <button type="submit" class="btn-submit" aria-label="Analyze my health assessment">
-                        <i class="fas fa-chart-line"></i>
-                        Analyze My Health
-                    </button>
-                    <p class="form-submit-note">Your values stay in this browser unless you choose to sync them with a Profile ID later.</p>
-                </form>
+                            <div class="form-group">
+                                <label for="sleepHours">
+                                    <i class="fas fa-bed"></i>
+                                    Sleep (hours/night)
+                                </label>
+                                <input type="number" id="sleepHours" name="sleepHours" min="0" max="24" step="0.5" placeholder="e.g. 7.5" required>
+                                <p class="form-help">Use your average night over the last week.</p>
+                            </div>
+
+                            <div class="form-group span-2">
+                                <label for="stressLevel">
+                                    <i class="fas fa-brain"></i>
+                                    Stress Level
+                                </label>
+                                <select id="stressLevel" name="stressLevel" required>
+                                    <option value="">Select stress level</option>
+                                    <option value="1">😊 Very Low - Feeling relaxed and calm</option>
+                                    <option value="2">🙂 Low - Minimal stress</option>
+                                    <option value="3">😐 Moderate - Manageable stress</option>
+                                    <option value="4">😟 High - Feeling stressed</option>
+                                    <option value="5">😰 Very High - Overwhelming stress</option>
+                                </select>
+                                <p class="form-help">Pick the option that best matches how you have felt most days this week.</p>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-submit" aria-label="Analyze my health assessment">
+                            <i class="fas fa-chart-line"></i>
+                            Generate Assessment
+                        </button>
+                        <p class="form-submit-note">Your entries remain on this device unless you choose to sync them later with a Profile ID.</p>
+                    </form>
+                </div>
+
+                <aside class="insight-rail">
+                    <section class="surface-card rail-card">
+                        <div class="rail-card-head">
+                            <span class="section-kicker">Why this feels more credible</span>
+                            <h3>Structured like a professional intake summary</h3>
+                        </div>
+                        <div class="rail-feature-list">
+                            <article class="rail-feature">
+                                <div class="rail-feature-icon"><i class="fas fa-chart-line"></i></div>
+                                <div>
+                                    <h4>Clear scoring logic</h4>
+                                    <p>Review an overall score alongside individual metric performance so it is easier to see what matters most.</p>
+                                </div>
+                            </article>
+                            <article class="rail-feature">
+                                <div class="rail-feature-icon"><i class="fas fa-layer-group"></i></div>
+                                <div>
+                                    <h4>Actionable next steps</h4>
+                                    <p>Turn results into focused recommendations, realistic goals, and better follow-up questions.</p>
+                                </div>
+                            </article>
+                            <article class="rail-feature">
+                                <div class="rail-feature-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                                <div>
+                                    <h4>Progress over time</h4>
+                                    <p>Track score changes, review trends, and keep your history local unless you opt into cloud sync.</p>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="surface-card rail-card rail-card-highlight">
+                        <div class="rail-card-head">
+                            <span class="section-kicker">Professional guardrails</span>
+                            <h3>What this assessment can and cannot do</h3>
+                        </div>
+                        <ul class="rail-bullet-list">
+                            <li>Useful for wellness review, pattern spotting, and habit planning.</li>
+                            <li>Not designed to diagnose disease or replace licensed medical care.</li>
+                            <li>Most valuable when used alongside clinician advice if symptoms or risk factors are present.</li>
+                        </ul>
+                    </section>
+                </aside>
             </div>
 
             <div id="resultsSection" class="results-section" style="display: none;">
                 <div class="section-header">
                     <i class="fas fa-chart-bar"></i>
-                    <h2>Your Health Assessment Results</h2>
+                    <div>
+                        <p class="section-kicker">Assessment Outcome</p>
+                        <h2>Your Assessment Results</h2>
+                    </div>
                 </div>
-                
+
+                <div class="results-intro surface-card">
+                    <div>
+                        <p class="results-intro-kicker">Current interpretation</p>
+                        <h3 id="resultsLead">Your assessment summary will appear here.</h3>
+                    </div>
+                    <div class="results-intro-side">
+                        <div id="resultsPriority" class="results-priority-pill">Priority focus will appear here</div>
+                        <p id="resultsTimestamp" class="results-intro-time">Generated after your latest assessment.</p>
+                    </div>
+                </div>
+
                 <div class="results-grid">
                     <div class="score-card">
                         <div class="overall-score">
+                            <span class="score-card-kicker">Overall assessment</span>
                             <div class="score-icon">
                                 <i class="fas fa-heart-pulse"></i>
                             </div>
@@ -231,10 +353,12 @@
                             <div class="score-progress">
                                 <div class="score-progress-bar" id="scoreProgressBar"></div>
                             </div>
+                            <p id="scoreSupportText" class="score-support-text">Your score interpretation will appear here.</p>
                         </div>
                     </div>
 
                     <div class="bmi-card">
+                        <span class="score-card-kicker">Body composition</span>
                         <div class="card-icon">
                             <i class="fas fa-weight-scale"></i>
                         </div>
@@ -244,33 +368,64 @@
                     </div>
                 </div>
 
-                <div class="detailed-scores">
+                <div class="clinical-summary-grid">
+                    <article class="surface-card summary-card">
+                        <span class="summary-card-label">Blood pressure</span>
+                        <strong id="bpReading">-- / -- mmHg</strong>
+                        <p id="bpSummary">Your blood pressure interpretation will appear here.</p>
+                    </article>
+                    <article class="surface-card summary-card">
+                        <span class="summary-card-label">Recovery profile</span>
+                        <strong id="recoveryReading">--</strong>
+                        <p id="recoverySummary">Your sleep and stress summary will appear here.</p>
+                    </article>
+                    <article class="surface-card summary-card">
+                        <span class="summary-card-label">Lifestyle profile</span>
+                        <strong id="lifestyleReading">--</strong>
+                        <p id="lifestyleSummary">Your activity and heart-rate summary will appear here.</p>
+                    </article>
+                </div>
+
+                <div class="results-band-grid">
+                    <article class="surface-card band-card band-card-positive">
+                        <span class="band-card-label">What looks steady</span>
+                        <h3 id="strengthTitle">Strengths will appear here</h3>
+                        <p id="strengthText">We will highlight one of the stronger parts of your current profile.</p>
+                    </article>
+                    <article class="surface-card band-card band-card-attention">
+                        <span class="band-card-label">What needs attention</span>
+                        <h3 id="attentionTitle">Focus areas will appear here</h3>
+                        <p id="attentionText">We will highlight the area most likely to improve your next review.</p>
+                    </article>
+                </div>
+
+                <div class="detailed-scores surface-card">
                     <h3>
                         <i class="fas fa-chart-line"></i>
-                        Detailed Metric Analysis
+                        Detailed Metric Review
                     </h3>
                     <div id="detailedScores"></div>
                 </div>
 
-                <div class="recommendations">
+                <div class="recommendations surface-card">
                     <h3>
                         <i class="fas fa-lightbulb"></i>
-                        Personalized Recommendations
+                        Personalized Guidance
                     </h3>
                     <ul id="recommendationsList"></ul>
                     <button id="askAiBtn" class="btn-ask-ai">
                         <i class="fas fa-robot"></i>
-                        Ask a Follow-Up Question
+                        Ask The Assistant
                     </button>
                 </div>
 
-                <div class="doctor-directory">
+                <div class="doctor-directory surface-card">
                     <h3>
                         <i class="fas fa-user-doctor"></i>
-                        Doctor Contacts in Nigeria
+                        Clinician Contacts in Nigeria
                     </h3>
                     <p id="doctorDirectoryNote" class="doctor-directory-note">
-                        If you need medical support, you can contact one of these providers.
+                        If you would like clinical follow-up, you can contact one of these providers.
                     </p>
                     <div class="doctor-directory-controls">
                         <div class="doctor-filter-group">
@@ -287,7 +442,7 @@
                         </div>
                         <button id="doctorRefreshBtn" class="doctor-refresh-btn" type="button">
                             <i class="fas fa-rotate"></i>
-                            Refresh List
+                            Refresh Directory
                         </button>
                     </div>
                     <p id="doctorDirectoryUpdated" class="doctor-directory-updated"></p>
@@ -295,26 +450,26 @@
                     <div id="doctorDirectoryList" class="doctor-directory-list"></div>
                 </div>
 
-                <div class="post-assessment-cta">
+                <div class="post-assessment-cta surface-card">
                     <h3 id="ctaTitle">
                         <i class="fas fa-bullseye"></i>
                         Next Step
                     </h3>
-                    <p id="ctaMessage">Get a personalized action plan based on your assessment.</p>
+                    <p id="ctaMessage">Generate a practical action plan based on your assessment.</p>
                     <button id="ctaPrimaryBtn" class="btn-cta-primary">
                         <i class="fas fa-route"></i>
-                        Build My Action Plan
+                        Create Action Plan
                     </button>
                 </div>
 
                 <div class="action-buttons">
                     <button onclick="resetForm()" class="btn-reset">
                         <i class="fas fa-redo"></i>
-                        New Assessment
+                        Start New Assessment
                     </button>
                     <button id="shareResultsBtn" class="btn-share">
                         <i class="fas fa-share-nodes"></i>
-                        Share Results
+                        Share Summary
                     </button>
                 </div>
             </div>
@@ -322,7 +477,10 @@
             <div id="historySection" class="history-section" style="display: none;">
                 <div class="section-header">
                     <i class="fas fa-chart-simple"></i>
-                    <h2>Your Progress History</h2>
+                    <div>
+                        <p class="section-kicker">Longitudinal Tracking</p>
+                        <h2>Your Progress History</h2>
+                    </div>
                 </div>
 
                 <div class="history-goal-card">
@@ -342,14 +500,14 @@
                         <div class="goal-progress">
                             <div id="goalProgressBar" class="goal-progress-bar"></div>
                         </div>
-                        <p id="goalProgressText">Set a target score to track your progress.</p>
+                        <p id="goalProgressText">Set a target score to monitor your progress over time.</p>
                     </div>
                 </div>
 
                 <div class="history-chart-card">
                     <h3>
                         <i class="fas fa-chart-column"></i>
-                        Overall Health Score Frequency
+                        Overall Score Distribution
                     </h3>
                     <div class="history-controls">
                         <label for="historyMetricSelect">Metric</label>
@@ -365,11 +523,11 @@
                         </select>
                     </div>
                     <p id="historyChartHelp" class="history-chart-help">
-                        Bars show how many saved assessments fall into each value range.
+                        Bars show how many saved assessments fall within each value range.
                     </p>
                     <div class="chart-frame history-chart-frame">
                         <div id="historyChartEmpty" class="history-chart-empty" hidden>
-                            Save an assessment to start building this frequency view.
+                            Save an assessment to begin building this distribution view.
                         </div>
                         <canvas id="historyTrendChart" height="120"></canvas>
                     </div>
@@ -380,7 +538,7 @@
                         <i class="fas fa-cloud-arrow-up"></i>
                         Sync Across Devices
                     </h3>
-                    <p class="sync-help">Use a Profile ID (letters, numbers, -, _) on each device. Choosing sync stores history and goal data on the server linked to that ID.</p>
+                    <p class="sync-help">Use the same Profile ID on each device. Enabling sync stores your history and goal data on the server linked to that ID.</p>
                     <div class="sync-controls">
                         <input type="text" id="syncProfileId" placeholder="e.g. myhealthprofile01" maxlength="40">
                         <button id="syncSaveBtn" class="btn-submit" type="button">
@@ -412,14 +570,14 @@
             <div class="footer-content">
                 <p>
                     <i class="fas fa-shield-heart"></i>
-                    <strong>Medical Disclaimer:</strong> This tool provides educational wellness guidance only and is not a medical diagnosis or treatment service.
+                    <strong>Medical Disclaimer:</strong> This tool provides educational wellness guidance only and does not provide diagnosis, treatment, or emergency medical care.
                     Always consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
                 </p>
                 <p class="footer-info">
-                    <i class="fas fa-lock"></i> Assessment history stays on your device unless you choose to sync it with a Profile ID.
+                    <i class="fas fa-lock"></i> Assessment history remains on this device unless you choose to sync it with a Profile ID.
                 </p>
                 <p class="footer-info">
-                    <a href="/analytics.html" class="footer-link">View local analytics dashboard</a>
+                    <a href="/analytics.html" class="footer-link">Open local analytics dashboard</a>
                 </p>
             </div>
         </footer>

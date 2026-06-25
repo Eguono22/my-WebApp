@@ -575,7 +575,7 @@ function initializeFormExperience() {
             trackEvent('form_example_used', {
                 source: 'onboarding_card'
             });
-            showNotification('Example values added. You can adjust anything before submitting.', 'success');
+            showNotification('Sample values loaded. Review and adjust anything before generating your assessment.', 'success');
         });
     }
 
@@ -588,6 +588,244 @@ function initializeFormExperience() {
             trackEvent('form_draft_cleared');
             showNotification('Draft cleared.', 'success');
         });
+    }
+}
+
+function getAssessmentWorkspace() {
+    return document.querySelector('.assessment-workspace');
+}
+
+function formatAssessmentTimestamp(date = new Date()) {
+    return date.toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getBloodPressureSummary(systolic, diastolic) {
+    if (systolic >= 140 || diastolic >= 90) {
+        return 'Elevated range. Consider clinician follow-up, especially if these readings are typical for you.';
+    }
+
+    if (systolic >= 120 || diastolic >= 80) {
+        return 'Slightly above the ideal range. Lifestyle consistency can make a meaningful difference.';
+    }
+
+    return 'Within a generally healthy range for many adults. Keep monitoring over time for consistency.';
+}
+
+function getRecoverySummary(sleepHours, stressLevel) {
+    const stressLabels = {
+        1: 'very low stress',
+        2: 'low stress',
+        3: 'moderate stress',
+        4: 'high stress',
+        5: 'very high stress'
+    };
+    const sleepLabel = sleepHours >= 7 && sleepHours <= 9
+        ? 'sleep is in a healthy range'
+        : sleepHours < 7
+            ? 'sleep appears below the usual recovery target'
+            : 'sleep is above the usual target range';
+    const stressLabel = stressLabels[stressLevel] || 'stress level not available';
+
+    return `${sleepLabel}, with ${stressLabel} reported this week.`;
+}
+
+function getLifestyleSummary(exerciseHours, heartRate) {
+    const exerciseLabel = exerciseHours >= 2.5
+        ? 'activity volume is solid'
+        : exerciseHours > 0
+            ? 'activity is present but could be more consistent'
+            : 'activity is currently very limited';
+    const heartRateLabel = heartRate <= 70
+        ? 'resting heart rate looks efficient'
+        : heartRate <= 85
+            ? 'resting heart rate is reasonable'
+            : 'resting heart rate may deserve closer attention';
+
+    return `${exerciseLabel}, and ${heartRateLabel}.`;
+}
+
+function getPriorityFocus(result) {
+    const detailedScores = result?.detailedScores && typeof result.detailedScores === 'object'
+        ? Object.entries(result.detailedScores)
+        : [];
+    const metricLabels = {
+        age: 'Age profile',
+        bmi: 'Weight balance',
+        bloodPressure: 'Blood pressure',
+        heartRate: 'Heart rate',
+        exercise: 'Exercise consistency',
+        sleep: 'Sleep quality',
+        stress: 'Stress management'
+    };
+
+    if (!detailedScores.length) {
+        return 'Priority focus unavailable';
+    }
+
+    const [lowestMetric] = detailedScores.sort((a, b) => a[1] - b[1])[0];
+    return `Priority focus: ${metricLabels[lowestMetric] || lowestMetric}`;
+}
+
+function getScoreSupportText(score) {
+    if (score >= 85) {
+        return 'You are in a strong range overall. The best next move is protecting consistency and avoiding backsliding.';
+    }
+
+    if (score >= 70) {
+        return 'Your foundation looks solid. A few targeted improvements could move this into a more confident range.';
+    }
+
+    if (score >= 50) {
+        return 'This is a workable starting point. Focused improvements in one or two weak areas should create visible progress.';
+    }
+
+    return 'Your results suggest a higher-priority reset. Start with the most strained metric and consider professional guidance if needed.';
+}
+
+function getMetricBand(score) {
+    if (score >= 85) return 'strong';
+    if (score >= 65) return 'moderate';
+    return 'attention';
+}
+
+function getAssessmentHighlights(result) {
+    const metricLabels = {
+        age: 'Age profile',
+        bmi: 'Weight balance',
+        bloodPressure: 'Blood pressure',
+        heartRate: 'Heart rate',
+        exercise: 'Exercise consistency',
+        sleep: 'Sleep quality',
+        stress: 'Stress management'
+    };
+    const metricDescriptions = {
+        age: 'A relatively favorable age factor is supporting your overall score.',
+        bmi: 'Your weight-to-height balance is one of the healthier parts of this assessment.',
+        bloodPressure: 'Blood pressure is helping keep your cardiovascular profile more stable.',
+        heartRate: 'Resting heart rate is currently one of your steadier signals.',
+        exercise: 'Your activity pattern is one of the strongest contributors right now.',
+        sleep: 'Sleep is providing a better recovery base than some of the other metrics.',
+        stress: 'Stress management is holding up better than the rest of the profile.'
+    };
+    const improvementDescriptions = {
+        age: 'Age is fixed, so the biggest opportunity is usually improving the lifestyle metrics around it.',
+        bmi: 'Small changes in weight balance can positively affect several other health markers.',
+        bloodPressure: 'This is the clearest area to monitor more closely because it affects overall risk and daily resilience.',
+        heartRate: 'Improving cardiovascular recovery and consistency may help this score move faster.',
+        exercise: 'A more reliable movement routine is likely to lift both your score and overall resilience.',
+        sleep: 'Better sleep can create spillover gains across recovery, stress, and heart-health signals.',
+        stress: 'Reducing stress load may unlock improvements across sleep, recovery, and daily decision-making.'
+    };
+    const scoredMetrics = Object.entries(result?.detailedScores || {});
+
+    if (!scoredMetrics.length) {
+        return {
+            strongestMetric: 'Overall profile',
+            strongestText: 'A clearer strength summary will appear once detailed scoring is available.',
+            weakestMetric: 'Priority area',
+            weakestText: 'A clearer focus area will appear once detailed scoring is available.'
+        };
+    }
+
+    const sortedMetrics = [...scoredMetrics].sort((a, b) => b[1] - a[1]);
+    const [strongestMetricKey] = sortedMetrics[0];
+    const [weakestMetricKey] = sortedMetrics[sortedMetrics.length - 1];
+
+    return {
+        strongestMetric: metricLabels[strongestMetricKey] || strongestMetricKey,
+        strongestText: metricDescriptions[strongestMetricKey] || 'This area is one of the stronger parts of your current assessment.',
+        weakestMetric: metricLabels[weakestMetricKey] || weakestMetricKey,
+        weakestText: improvementDescriptions[weakestMetricKey] || 'This area is the clearest place to focus first.'
+    };
+}
+
+function renderResultsNarrative(result) {
+    const resultsLead = document.getElementById('resultsLead');
+    const resultsTimestamp = document.getElementById('resultsTimestamp');
+    const resultsPriority = document.getElementById('resultsPriority');
+    const scoreSupportText = document.getElementById('scoreSupportText');
+    const strengthTitle = document.getElementById('strengthTitle');
+    const strengthText = document.getElementById('strengthText');
+    const attentionTitle = document.getElementById('attentionTitle');
+    const attentionText = document.getElementById('attentionText');
+    const bpReading = document.getElementById('bpReading');
+    const bpSummary = document.getElementById('bpSummary');
+    const recoveryReading = document.getElementById('recoveryReading');
+    const recoverySummary = document.getElementById('recoverySummary');
+    const lifestyleReading = document.getElementById('lifestyleReading');
+    const lifestyleSummary = document.getElementById('lifestyleSummary');
+
+    if (resultsLead) {
+        resultsLead.textContent = `Overall score ${result.overallScore}/100, currently rated ${String(result.status).toLowerCase()}.`;
+    }
+
+    if (resultsTimestamp) {
+        resultsTimestamp.textContent = `Generated ${formatAssessmentTimestamp()}`;
+    }
+
+    if (resultsPriority) {
+        resultsPriority.textContent = getPriorityFocus(result);
+    }
+
+    if (scoreSupportText) {
+        scoreSupportText.textContent = getScoreSupportText(Number(result?.overallScore || 0));
+    }
+
+    const highlights = getAssessmentHighlights(result);
+
+    if (strengthTitle) {
+        strengthTitle.textContent = highlights.strongestMetric;
+    }
+
+    if (strengthText) {
+        strengthText.textContent = highlights.strongestText;
+    }
+
+    if (attentionTitle) {
+        attentionTitle.textContent = highlights.weakestMetric;
+    }
+
+    if (attentionText) {
+        attentionText.textContent = highlights.weakestText;
+    }
+
+    if (bpReading) {
+        bpReading.textContent = `${currentAssessmentData?.systolic ?? '--'} / ${currentAssessmentData?.diastolic ?? '--'} mmHg`;
+    }
+
+    if (bpSummary) {
+        bpSummary.textContent = getBloodPressureSummary(
+            Number(currentAssessmentData?.systolic || 0),
+            Number(currentAssessmentData?.diastolic || 0)
+        );
+    }
+
+    if (recoveryReading) {
+        recoveryReading.textContent = `${currentAssessmentData?.sleepHours ?? '--'}h sleep  |  Stress ${currentAssessmentData?.stressLevel ?? '--'}/5`;
+    }
+
+    if (recoverySummary) {
+        recoverySummary.textContent = getRecoverySummary(
+            Number(currentAssessmentData?.sleepHours || 0),
+            Number(currentAssessmentData?.stressLevel || 0)
+        );
+    }
+
+    if (lifestyleReading) {
+        lifestyleReading.textContent = `${currentAssessmentData?.exerciseHours ?? '--'}h activity  |  ${currentAssessmentData?.heartRate ?? '--'} bpm`;
+    }
+
+    if (lifestyleSummary) {
+        lifestyleSummary.textContent = getLifestyleSummary(
+            Number(currentAssessmentData?.exerciseHours || 0),
+            Number(currentAssessmentData?.heartRate || 0)
+        );
     }
 }
 
@@ -612,7 +850,7 @@ healthForm.addEventListener('submit', async (e) => {
         // Show loading state
         const submitBtn = document.querySelector('.btn-submit');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing Your Health...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Assessment...';
         submitBtn.disabled = true;
 
         // Call the API
@@ -642,7 +880,10 @@ healthForm.addEventListener('submit', async (e) => {
         renderHistorySection();
         
         // Hide form and show results with animation
-        document.querySelector('.form-section').style.display = 'none';
+        const assessmentWorkspace = getAssessmentWorkspace();
+        if (assessmentWorkspace) {
+            assessmentWorkspace.style.display = 'none';
+        }
         document.getElementById('resultsSection').style.display = 'block';
         
         // Scroll to results
@@ -654,12 +895,12 @@ healthForm.addEventListener('submit', async (e) => {
         }, 100);
 
     } catch (error) {
-        showNotification('An error occurred during health assessment. Please try again.', 'error');
+        showNotification('The assessment could not be completed. Please review your entries and try again.', 'error');
         console.error('Error:', error);
     } finally {
         // Reset button state
         const submitBtn = document.querySelector('.btn-submit');
-        submitBtn.innerHTML = '<i class="fas fa-chart-line"></i> Analyze My Health';
+        submitBtn.innerHTML = '<i class="fas fa-chart-line"></i> Generate Assessment';
         submitBtn.disabled = false;
     }
 });
@@ -692,6 +933,7 @@ function displayResults(result) {
     }
     
     scoreDisplay.style.color = statusColor;
+    scoreStatus.style.color = statusColor;
 
     // Display BMI
     const bmiValue = document.getElementById('bmiValue');
@@ -728,15 +970,18 @@ function displayResults(result) {
     
     for (const [metric, score] of Object.entries(result.detailedScores)) {
         const scoreItem = document.createElement('div');
-        scoreItem.className = 'score-item';
+        scoreItem.className = `score-item score-item-${getMetricBand(score)}`;
         
         const metricInfo = metricLabels[metric] || { name: metric, icon: 'fa-check' };
         
         scoreItem.innerHTML = `
-            <span class="score-item-name">
-                <i class="fas ${metricInfo.icon}"></i>
-                ${metricInfo.name}
-            </span>
+            <div class="score-item-name-wrap">
+                <span class="score-item-name">
+                    <i class="fas ${metricInfo.icon}"></i>
+                    ${metricInfo.name}
+                </span>
+                <span class="score-item-band">${getMetricBand(score)}</span>
+            </div>
             <div class="score-bar-container">
                 <div class="score-bar" style="width: 0%;" data-width="${score}"></div>
             </div>
@@ -771,6 +1016,7 @@ function displayResults(result) {
         }, 100 * (index + 1));
     });
 
+    renderResultsNarrative(result);
     renderDoctorDirectory(result.overallScore);
     updatePostAssessmentCta(result);
     updateChatExperience(`score ${result.overallScore} ${result.status}`);
@@ -790,14 +1036,14 @@ function renderDoctorDirectory(overallScore, forceRefresh = false) {
     bindDoctorDirectoryControls();
 
     if (overallScore < 50) {
-        directoryNote.textContent = 'Your score suggests you should consult a doctor soon. Call any provider below and explain your symptoms clearly.';
+        directoryNote.textContent = 'Your score suggests timely clinical follow-up may be appropriate. Contact a provider below and explain your symptoms clearly.';
     } else if (overallScore < 70) {
-        directoryNote.textContent = 'A consultation can help you turn these results into a safe improvement plan.';
+        directoryNote.textContent = 'A clinical consultation can help translate these results into a safe and realistic improvement plan.';
     } else {
-        directoryNote.textContent = 'For personalized advice, you can still consult any provider below.';
+        directoryNote.textContent = 'If you would like personalized clinical advice, you can still consult any provider below.';
     }
 
-    directoryList.innerHTML = '<p class="doctor-loading">Loading verified doctors in Nigeria...</p>';
+    directoryList.innerHTML = '<p class="doctor-loading">Loading clinician directory for Nigeria...</p>';
     directoryCount.textContent = '';
     directoryUpdated.textContent = forceRefresh ? 'Last updated: refreshing...' : formatDoctorDirectoryUpdatedText(nigeriaDoctorsFetchedAt);
 
@@ -828,12 +1074,12 @@ function renderDoctorDirectory(overallScore, forceRefresh = false) {
         });
 
         if (result.fallback) {
-            directoryNote.textContent += ' Source was temporarily unavailable, so a backup list is shown.';
+            directoryNote.textContent += ' The primary source was temporarily unavailable, so a backup directory is shown.';
         } else if (result.stale) {
-            directoryNote.textContent += ' Showing cached doctor data while the source updates.';
+            directoryNote.textContent += ' Cached directory data is being shown while the source refreshes.';
         }
     }).catch(() => {
-        directoryList.innerHTML = '<p class="doctor-loading">Unable to load source right now. Please try again shortly.</p>';
+        directoryList.innerHTML = '<p class="doctor-loading">The directory is temporarily unavailable. Please try again shortly.</p>';
         directoryCount.textContent = '';
         directoryUpdated.textContent = formatDoctorDirectoryUpdatedText(nigeriaDoctorsFetchedAt);
     }).finally(() => {
@@ -849,29 +1095,29 @@ function updatePostAssessmentCta(result) {
     const ctaPrimaryBtn = document.getElementById('ctaPrimaryBtn');
 
     let titleText = 'Next Step';
-    let messageText = 'Get a personalized action plan based on your assessment.';
-    let buttonText = 'Build My Action Plan';
+    let messageText = 'Generate a practical action plan based on your assessment.';
+    let buttonText = 'Create Action Plan';
     let aiPrompt = 'Create a practical weekly health action plan from my assessment results.';
 
     if (result.overallScore >= 85) {
-        titleText = 'Keep Your Momentum';
-        messageText = 'You are doing great. Build a maintenance plan to protect these results.';
+        titleText = 'Maintain Your Momentum';
+        messageText = 'Your results are strong. Create a maintenance plan to protect this level of health performance.';
         buttonText = 'Create Maintenance Plan';
         aiPrompt = 'I scored in the excellent range. Create a 7-day maintenance plan to keep my health score high.';
     } else if (result.overallScore >= 70) {
-        titleText = 'Move From Good To Excellent';
-        messageText = 'A focused weekly plan can help improve your lowest-scoring areas.';
-        buttonText = 'Build Improvement Plan';
+        titleText = 'Move From Good To Stronger';
+        messageText = 'A focused weekly plan can help strengthen your lowest-scoring areas.';
+        buttonText = 'Create Improvement Plan';
         aiPrompt = 'I scored in the good range. Create a 7-day plan to move from good to excellent health.';
     } else if (result.overallScore >= 50) {
-        titleText = 'Start Your Recovery Plan';
-        messageText = 'Take small daily actions to improve your sleep, activity, and stress levels.';
+        titleText = 'Start A Focused Recovery Plan';
+        messageText = 'Small daily actions can begin improving sleep, activity, recovery, and stress load.';
         buttonText = 'Start 7-Day Plan';
         aiPrompt = 'I scored in the fair range. Give me a simple 7-day recovery plan with daily goals.';
     } else {
-        titleText = 'Act Now';
-        messageText = 'Prioritize professional support and a clear daily routine for immediate improvement.';
-        buttonText = 'Get Priority Plan';
+        titleText = 'Prioritize Immediate Support';
+        messageText = 'Focus on timely professional support and a clear daily routine aimed at early improvement.';
+        buttonText = 'Create Priority Plan';
         aiPrompt = 'I scored in needs improvement. Give me a gentle but urgent 7-day plan and tell me what to discuss with a healthcare professional.';
     }
 
@@ -905,7 +1151,10 @@ function resetForm() {
     updateChatExperience();
     
     // Show form and hide results
-    document.querySelector('.form-section').style.display = 'block';
+    const assessmentWorkspace = getAssessmentWorkspace();
+    if (assessmentWorkspace) {
+        assessmentWorkspace.style.display = 'grid';
+    }
     document.getElementById('resultsSection').style.display = 'none';
     
     // Scroll to top
@@ -924,11 +1173,15 @@ const chatHeaderHint = document.getElementById('chatHeaderHint');
 const chatInputHint = document.getElementById('chatInputHint');
 const askAiBtn = document.getElementById('askAiBtn');
 const ctaPrimaryBtn = document.getElementById('ctaPrimaryBtn');
+const chatContextTitle = document.getElementById('chatContextTitle');
+const chatContextSummary = document.getElementById('chatContextSummary');
+const chatContextScore = document.getElementById('chatContextScore');
+const chatContextPrompt = document.getElementById('chatContextPrompt');
 const DEFAULT_CHAT_SUGGESTIONS = [
-    'Explain what a good health score means',
-    'Give me 3 simple stress-reduction habits',
+    'Explain what a strong health score usually indicates',
+    'Give me 3 evidence-based stress-reduction habits',
     'How much exercise should I aim for this week?',
-    'What does healthy sleep usually look like?'
+    'What does healthy sleep typically look like?'
 ];
 
 function openChatPanel(source, prefillMessage = '') {
@@ -1021,19 +1274,56 @@ function updateChatHeader() {
     }
 
     if (!currentAssessmentData) {
-        chatHeaderHint.textContent = 'Ask about your score, sleep, exercise, or next best step.';
+        chatHeaderHint.textContent = 'Ask about your score, sleep, exercise, or the most sensible next step.';
         return;
     }
 
     const score = Number(currentAssessmentData.overallScore || 0);
 
     if (score < 50) {
-        chatHeaderHint.textContent = `Latest score: ${score}. Let's focus on the safest first improvements.`;
+        chatHeaderHint.textContent = `Latest score: ${score}. Let's focus on the safest and most practical first improvements.`;
     } else if (score < 70) {
-        chatHeaderHint.textContent = `Latest score: ${score}. I can help turn these results into a realistic weekly plan.`;
+        chatHeaderHint.textContent = `Latest score: ${score}. I can turn these results into a realistic weekly improvement plan.`;
     } else {
-        chatHeaderHint.textContent = `Latest score: ${score}. Let's protect your progress and improve your consistency.`;
+        chatHeaderHint.textContent = `Latest score: ${score}. Let's protect your progress and strengthen your consistency.`;
     }
+}
+
+function updateChatContextPanel(lastMessage = '') {
+    if (!chatContextTitle || !chatContextSummary || !chatContextScore || !chatContextPrompt) {
+        return;
+    }
+
+    if (!currentAssessmentData) {
+        chatContextTitle.textContent = 'General wellness guidance';
+        chatContextSummary.textContent = 'Ask for a plain-language explanation, a weekly plan, or help understanding common health habits.';
+        chatContextScore.textContent = 'No score yet';
+        chatContextPrompt.textContent = lastMessage
+            ? 'Ask a follow-up to your last question'
+            : 'Ask what a balanced health routine looks like';
+        return;
+    }
+
+    const score = Number(currentAssessmentData.overallScore || 0);
+    chatContextScore.textContent = `${score}/100 (${currentAssessmentData.status})`;
+
+    if (score < 50) {
+        chatContextTitle.textContent = 'Higher-priority improvement planning';
+        chatContextSummary.textContent = 'Use the assistant for calm, practical next steps and better questions to raise with a healthcare professional.';
+        chatContextPrompt.textContent = 'Ask what to improve first this week';
+        return;
+    }
+
+    if (score < 70) {
+        chatContextTitle.textContent = 'Focused improvement support';
+        chatContextSummary.textContent = 'This range is well suited to a focused weekly plan built around your lowest-scoring areas.';
+        chatContextPrompt.textContent = 'Ask for a 7-day improvement plan';
+        return;
+    }
+
+    chatContextTitle.textContent = 'Maintenance and optimization';
+    chatContextSummary.textContent = 'Use the assistant to protect your progress, improve consistency, and refine high-value habits.';
+    chatContextPrompt.textContent = 'Ask how to maintain this score';
 }
 
 function updateChatComposerHint(prefillMessage = '') {
@@ -1045,8 +1335,8 @@ function updateChatComposerHint(prefillMessage = '') {
 
     if (!normalized) {
         chatInputHint.textContent = currentAssessmentData
-            ? 'Try asking for a simple explanation, a weekly plan, or a habit checklist.'
-            : 'You can ask for a plan, explanation, or a simple wellness tip.';
+            ? 'Try asking for an explanation, a weekly plan, or a habit checklist.'
+            : 'You can ask for a plan, an explanation, or a simple wellness recommendation.';
         return;
     }
 
@@ -1056,11 +1346,11 @@ function updateChatComposerHint(prefillMessage = '') {
     }
 
     if (normalized.includes('score') || normalized.includes('result')) {
-        chatInputHint.textContent = 'You can ask which metric matters most or what to improve first.';
+        chatInputHint.textContent = 'You can ask which metric matters most or where to focus first.';
         return;
     }
 
-    chatInputHint.textContent = 'Press Enter to send, or pick one of the guided prompts above.';
+    chatInputHint.textContent = 'Press Enter to send, or choose one of the guided prompts above.';
 }
 
 function renderChatSuggestions(prompts) {
@@ -1074,6 +1364,9 @@ function renderChatSuggestions(prompts) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'chat-suggestion-chip';
+        if (currentAssessmentData) {
+            button.classList.add('is-contextual');
+        }
         button.textContent = prompt;
         button.addEventListener('click', () => {
             chatInput.value = prompt;
@@ -1086,6 +1379,7 @@ function renderChatSuggestions(prompts) {
 
 function updateChatExperience(lastMessage = '') {
     updateChatHeader();
+    updateChatContextPanel(lastMessage);
     updateChatComposerHint(lastMessage);
     renderChatSuggestions(buildFollowUpSuggestions(lastMessage));
 }
@@ -1221,7 +1515,7 @@ function updateGoalProgress(history, scoreGoal) {
     if (!progressBar || !progressText) return;
     if (!history.length) {
         progressBar.style.width = '0%';
-        progressText.textContent = 'Set a target score to track your progress.';
+        progressText.textContent = 'Set a target score to monitor progress over time.';
         return;
     }
 
@@ -1233,10 +1527,10 @@ function updateGoalProgress(history, scoreGoal) {
     progressBar.style.width = `${percentage}%`;
 
     if (gap <= 0) {
-        progressText.textContent = `Goal reached. Latest score ${latestScore} is at or above your target ${scoreGoal}.`;
+        progressText.textContent = `Goal reached. Your latest score of ${latestScore} is at or above your target of ${scoreGoal}.`;
         progressBar.style.background = 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
     } else {
-        progressText.textContent = `${gap} points to go. Latest score: ${latestScore}, target: ${scoreGoal}.`;
+        progressText.textContent = `${gap} points remaining. Latest score: ${latestScore}; target: ${scoreGoal}.`;
         progressBar.style.background = 'linear-gradient(90deg, #22c55e 0%, #3b82f6 100%)';
     }
 }
@@ -1258,7 +1552,7 @@ function renderTrendChart(history) {
         if (valueCount <= 1) {
             chartHelp.textContent = `Only ${valueCount === 1 ? 'one assessment is' : 'no assessments are'} saved for ${metricConfig.label.toLowerCase()} so far, so this view will become more useful as you add more check-ins.`;
         } else {
-            chartHelp.textContent = 'Bars show how many saved assessments fall into each value range.';
+            chartHelp.textContent = 'Bars show how many saved assessments fall within each value range.';
         }
     }
 
@@ -1397,7 +1691,7 @@ async function sendMessage(forcedMessage = '', source = 'typed_input') {
     } catch (error) {
         console.error('Chat error:', error);
         typingIndicator.remove();
-        addMessage('I apologize, but I\'m having trouble connecting right now. Please try again in a moment.', 'bot');
+        addMessage('I am having trouble connecting right now. Please try again in a moment.', 'bot');
         updateChatExperience(message);
     }
 }
@@ -1411,6 +1705,9 @@ function addMessage(text, sender) {
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
+    if (sender === 'bot' && currentAssessmentData) {
+        contentDiv.classList.add('is-key-response');
+    }
 
     const messageTag = document.createElement('span');
     messageTag.className = 'message-tag';
@@ -1425,9 +1722,20 @@ function addMessage(text, sender) {
     timeSpan.className = 'message-time';
     timeSpan.textContent = timeString;
 
+    const metaRow = document.createElement('div');
+    metaRow.className = 'message-meta-row';
+
+    const badge = document.createElement('span');
+    badge.className = 'message-badge';
+    badge.innerHTML = sender === 'bot'
+        ? '<i class="fas fa-notes-medical"></i> Guided response'
+        : '<i class="fas fa-pen"></i> Your question';
+
     contentDiv.appendChild(messageTag);
     contentDiv.appendChild(textParagraph);
-    contentDiv.appendChild(timeSpan);
+    metaRow.appendChild(badge);
+    metaRow.appendChild(timeSpan);
+    contentDiv.appendChild(metaRow);
     messageDiv.appendChild(contentDiv);
 
     chatMessages.appendChild(messageDiv);
@@ -1477,7 +1785,7 @@ Check your health at: ${window.location.href}`;
                 trackEvent('results_shared', {
                     method: 'native_share'
                 });
-                showNotification('Results shared successfully!', 'success');
+                showNotification('Assessment summary shared successfully.', 'success');
             } catch (error) {
                 if (error.name !== 'AbortError') {
                     fallbackShare(shareText);
@@ -1494,60 +1802,60 @@ function fallbackShare(text) {
         trackEvent('results_shared', {
             method: 'clipboard'
         });
-        showNotification('Results copied to clipboard!', 'success');
+        showNotification('Assessment summary copied to the clipboard.', 'success');
     }).catch(() => {
-        showNotification('Unable to share results', 'error');
+        showNotification('Unable to share the assessment summary.', 'error');
     });
 }
 
 function showNotification(message, type = 'info') {
-    // Create notification element
+    const notificationStack = document.getElementById('notificationStack');
+    if (!notificationStack) {
+        return;
+    }
+
     const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 16px 24px;
-        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
-        color: white;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-        z-index: 10000;
-        animation: slideIn 0.3s ease-out;
-        font-weight: 500;
-    `;
+    notification.className = `notification-toast is-${type}`;
     notification.textContent = message;
     
-    document.body.appendChild(notification);
+    notificationStack.appendChild(notification);
     
     setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => notification.remove(), 300);
+        notification.classList.add('is-exiting');
+        setTimeout(() => notification.remove(), 280);
     }, 3000);
 }
 
 // Add animation styles dynamically
 const style = document.createElement('style');
 style.textContent = `
-    @keyframes slideIn {
+    .notification-toast {
+        animation: toastIn 0.24s ease-out;
+    }
+
+    .notification-toast.is-exiting {
+        animation: toastOut 0.24s ease-out forwards;
+    }
+
+    @keyframes toastIn {
         from {
             opacity: 0;
-            transform: translateX(100px);
+            transform: translateY(12px);
         }
         to {
             opacity: 1;
-            transform: translateX(0);
+            transform: translateY(0);
         }
     }
-    
-    @keyframes slideOut {
+
+    @keyframes toastOut {
         from {
             opacity: 1;
-            transform: translateX(0);
+            transform: translateY(0);
         }
         to {
             opacity: 0;
-            transform: translateX(100px);
+            transform: translateY(10px);
         }
     }
 `;
@@ -1588,7 +1896,7 @@ window.addEventListener('load', () => {
 
     renderHistorySection();
     setTimeout(() => {
-        showNotification('Welcome! Start your health assessment or chat with the health assistant.', 'info');
+        showNotification('Welcome. Start an assessment or open the assistant for guided wellness support.', 'info');
     }, 1000);
 });
 
@@ -1671,7 +1979,7 @@ if (syncSaveBtn) {
             showNotification('Cloud sync saved successfully.', 'success');
         } catch (error) {
             console.error('Sync save failed:', error);
-            showNotification(`Save failed: ${error.message}`, 'error');
+            showNotification(`Cloud save failed: ${error.message}`, 'error');
         }
     });
 }
@@ -1707,10 +2015,10 @@ if (syncLoadBtn) {
             trackEvent('history_sync_loaded', {
                 historyCount: Array.isArray(payload.history) ? payload.history.length : 0
             });
-            showNotification('Cloud data loaded.', 'success');
+            showNotification('Cloud data loaded successfully.', 'success');
         } catch (error) {
             console.error('Sync load failed:', error);
-            showNotification(`Load failed: ${error.message}`, 'error');
+            showNotification(`Cloud load failed: ${error.message}`, 'error');
         }
     });
 }
