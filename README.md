@@ -25,6 +25,8 @@ cd my-WebApp
 npm install
 ```
 
+Supported Node.js versions: `20` and `22`.
+
 ## Usage
 
 1. Start the server:
