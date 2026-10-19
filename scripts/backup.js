@@ -32,7 +32,7 @@ async function run() {
         console.log('Encrypted backup integrity verified.');
         return;
     }
-    const base = new URL(process.env.PRODUCTION_URL || 'https://my-web-app-eguono22s-projects.vercel.app');
+    const base = new URL(process.env.PRODUCTION_URL || 'https://my-web-app-wheat.vercel.app');
     if (base.protocol !== 'https:') throw new Error('Backups require HTTPS.');
     if (!process.env.ANALYTICS_ADMIN_PASSWORD) throw new Error('ANALYTICS_ADMIN_PASSWORD is required.');
     const response = await fetch(new URL('/api/admin/export', base), {

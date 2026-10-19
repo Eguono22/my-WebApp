@@ -57,7 +57,7 @@ Smoke tests use isolated temporary storage and verify assessment validation, cha
 
 ## Vercel deployment
 
-The linked project is `eguono22s-projects/my-web-app`. Its default production URL is https://my-web-app-eguono22s-projects.vercel.app.
+The linked project is `eguono22s-projects/my-web-app`. Its default production URL is https://my-web-app-wheat.vercel.app.
 
 1. Configure `DATABASE_URL` and separate strong `ANALYTICS_ADMIN_PASSWORD` values for production and preview.
 2. Configure production `CRON_SECRET` using a cryptographically random secret.

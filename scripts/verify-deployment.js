@@ -23,7 +23,7 @@ async function verifyDeployment(baseUrl, fetcher = fetch) {
 }
 
 if (require.main === module) {
-    verifyDeployment(process.env.PRODUCTION_URL || 'https://my-web-app-eguono22s-projects.vercel.app')
+    verifyDeployment(process.env.PRODUCTION_URL || 'https://my-web-app-wheat.vercel.app')
         .catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
 module.exports = { verifyDeployment };
