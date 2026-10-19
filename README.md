@@ -68,6 +68,8 @@ The linked project is `eguono22s-projects/my-web-app`. Its default production UR
 
 The database role must be able to create tables and the `health_preview` and `health_backups` schemas. Deployments add a credential-hash column to existing profile tables without deleting existing records. Local databases, secrets, backups, and temporary screenshots are excluded from deployment uploads.
 
+Vercel requires verified Git commits for automatic deployments. Keep that safeguard enabled; unsigned pushes can be canceled even when a direct CLI deployment succeeds.
+
 Production checks run daily and on main-branch pushes. Override the GitHub repository variable `PRODUCTION_URL` if the production domain changes.
 
 ## Cloud backups and recovery
