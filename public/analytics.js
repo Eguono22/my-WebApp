@@ -147,10 +147,36 @@ function renderFunnel(summary) {
 
 function renderTrendChart(recentDaily) {
     const canvas = document.getElementById('analyticsTrendChart');
-    if (!canvas || typeof Chart === 'undefined') return;
+    const tableContainer = document.getElementById('analyticsTrendTable');
+    if (tableContainer) {
+        tableContainer.replaceChildren();
+        const table = document.createElement('table');
+        table.className = 'analytics-trend-table';
+        const caption = table.createCaption();
+        caption.textContent = 'Daily activity (UTC)';
+        const head = table.createTHead().insertRow();
+        ['Date', 'Views', 'Assessments', 'Chat opens'].forEach((label) => {
+            const cell = document.createElement('th');
+            cell.scope = 'col';
+            cell.textContent = label;
+            head.appendChild(cell);
+        });
+        const body = table.createTBody();
+        recentDaily.forEach((day) => {
+            const row = body.insertRow();
+            [day.date, day.pageViews, day.assessmentsCompleted, day.chatOpens].forEach((value) => {
+                row.insertCell().textContent = String(value);
+            });
+        });
+        tableContainer.appendChild(table);
+    }
+    if (!canvas || typeof Chart === 'undefined') {
+        if (canvas) canvas.parentElement.hidden = true;
+        return;
+    }
 
     const labels = recentDaily.map((entry) =>
-        new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        new Date(`${entry.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     );
 
     if (analyticsTrendChart) {
@@ -209,10 +235,13 @@ function renderTrendChart(recentDaily) {
 }
 
 async function loadAnalyticsSummary() {
+    const refreshButton = document.getElementById('analyticsRefreshBtn');
+    if (refreshButton) refreshButton.disabled = true;
+    setText('analyticsLoadStatus', 'Loading analytics…');
     try {
         const response = await fetch('/api/analytics/summary');
         if (!response.ok) {
-            throw new Error('Failed to load analytics summary');
+            throw new Error(response.status === 401 ? 'Sign in again to view analytics.' : 'Unable to load analytics. Use Refresh data to try again.');
         }
 
         const summary = await response.json();
@@ -234,13 +263,22 @@ async function loadAnalyticsSummary() {
         );
         setText('generatedAtText', formatGeneratedAt(summary.generatedAt));
 
+        fetch('/api/admin/backups').then(async (response) => {
+            if (!response.ok) return;
+            const payload = await response.json();
+            const latest = payload.backups?.[0];
+            if (latest) setText('analyticsBackupStatus', `Latest cloud backup: ${new Date(latest.createdAt).toLocaleString()}. Retained for seven days.`);
+        }).catch(() => {});
         renderTopEvents(summary.topEvents || []);
         renderSignals(summary);
         renderFunnel(summary);
         renderTrendChart(summary.recentDaily || []);
+        setText('analyticsLoadStatus', summary.totals.totalEvents ? 'Showing all-time totals and the last seven days of activity.' : 'No activity yet. Complete an assessment in the app to see activity here.');
     } catch (error) {
         console.error(error);
-        setText('generatedAtText', 'Unable to load analytics summary.');
+        setText('analyticsLoadStatus', error.message);
+    } finally {
+        if (refreshButton) refreshButton.disabled = false;
     }
 }
 
@@ -257,6 +295,9 @@ function initializeRestoreAction() {
         try {
             const fileContents = await file.text();
             const payload = JSON.parse(fileContents);
+            if (!payload || !Array.isArray(payload.syncedProfiles) || !Array.isArray(payload.analyticsEvents)) {
+                throw new Error('Invalid backup');
+            }
             const profileCount = Array.isArray(payload.syncedProfiles) ? payload.syncedProfiles.length : 0;
             const eventCount = Array.isArray(payload.analyticsEvents) ? payload.analyticsEvents.length : 0;
 
@@ -299,5 +340,21 @@ function initializeRestoreAction() {
 
 window.addEventListener('load', () => {
     initializeRestoreAction();
+    document.getElementById('analyticsBackupBtn')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        setText('analyticsBackupStatus', 'Creating cloud snapshot…');
+        try {
+            const response = await fetch('/api/admin/backup', { method: 'POST' });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Cloud backup failed.');
+            setText('analyticsBackupStatus', `Cloud backup created: ${result.backupId}. Snapshots are retained for ${result.retentionDays} days.`);
+        } catch (error) {
+            setText('analyticsBackupStatus', error.message);
+        } finally {
+            button.disabled = false;
+        }
+    });
+    document.getElementById('analyticsRefreshBtn')?.addEventListener('click', loadAnalyticsSummary);
     loadAnalyticsSummary();
 });

@@ -11,3 +11,10 @@ data/*.db-wal
 data/storage-fallback.json
 
 .env*.local
+.env*
+!.env.example
+
+backups/
+test-results/
+playwright-report/
+data/*.tmp

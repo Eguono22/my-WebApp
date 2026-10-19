@@ -1,4 +1,7 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const PORT = Number(process.env.SMOKE_TEST_PORT || 3100);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const ANALYTICS_ADMIN_PASSWORD = 'smoke-test-password';
@@ -34,8 +37,16 @@ async function fetchJson(url, options) {
 async function run() {
     process.env.NODE_ENV = 'production';
     process.env.ANALYTICS_ADMIN_PASSWORD = ANALYTICS_ADMIN_PASSWORD;
+    const testDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'health-app-test-'));
+    process.env.DATA_DIRECTORY = testDirectory;
+    // Preserve isolation even when a developer has configured a local database.
+    process.env.DATABASE_URL = '';
     const app = require('../server');
-    const server = app.listen(PORT);
+    const server = app.listen(PORT, '127.0.0.1');
+    await new Promise((resolve, reject) => {
+        server.once('listening', resolve);
+        server.once('error', reject);
+    });
 
     try {
         const home = await fetchText(`${BASE_URL}/`);
@@ -158,7 +169,24 @@ async function run() {
         );
 
         const sessionId = `smoke-${Date.now()}`;
-        const profileId = `smoke${Date.now()}`;
+        const createdProfile = await fetchJson(`${BASE_URL}/api/history/profile`, { method: 'POST' });
+        assert.equal(createdProfile.response.status, 201, 'A cloud profile should be generated.');
+        const profileId = createdProfile.json.profileId;
+        const token = createdProfile.json.syncKey.split('.')[1];
+        const syncHeaders = { Authorization: `Bearer ${token}` };
+        const otherProfile = await fetchJson(`${BASE_URL}/api/history/profile`, { method: 'POST' });
+        const otherHeaders = { Authorization: `Bearer ${otherProfile.json.syncKey.split('.')[1]}` };
+        for (const headers of [{}, otherHeaders]) {
+            const blockedLoad = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`, { headers });
+            assert.equal(blockedLoad.response.status, 401, 'Missing or another profile’s key must not read history.');
+            const blockedSave = await fetchJson(`${BASE_URL}/api/history/sync`, {
+                method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profileId, history: [] })
+            });
+            assert.equal(blockedSave.response.status, 401, 'Missing or another profile’s key must not overwrite history.');
+            const blockedDelete = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`, { method: 'DELETE', headers });
+            assert.equal(blockedDelete.response.status, 401, 'Missing or another profile’s key must not delete history.');
+        }
 
         const pageViewEvent = await fetchJson(`${BASE_URL}/api/analytics/event`, {
             method: 'POST',
@@ -197,6 +225,18 @@ async function run() {
             sleepHours: 7.5,
             stressLevel: 2
         };
+
+        const invalidAssessment = await fetchJson(`${BASE_URL}/api/assess`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...assessmentPayload, systolic: 75, diastolic: 80 })
+        });
+        assert.equal(invalidAssessment.response.status, 400, 'Inconsistent blood pressure must be rejected.');
+
+        const invalidBackup = await fetchJson(`${BASE_URL}/api/admin/restore`, {
+            method: 'POST', headers: { ...createAnalyticsAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        assert.equal(invalidBackup.response.status, 400, 'Unrelated JSON must not erase admin data.');
 
         const assessment = await fetchJson(`${BASE_URL}/api/assess`, {
             method: 'POST',
@@ -253,7 +293,7 @@ async function run() {
 
         const syncSave = await fetchJson(`${BASE_URL}/api/history/sync`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...syncHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 profileId,
                 goalTarget: 85,
@@ -276,10 +316,19 @@ async function run() {
         assert.equal(syncSave.response.status, 200, 'History sync save should return 200.');
         assert.equal(syncSave.json?.ok, true, 'History sync save should confirm success.');
 
-        const syncLoad = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`);
+        const syncLoad = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`, { headers: syncHeaders });
         assert.equal(syncLoad.response.status, 200, 'History sync load should return 200.');
         assert.equal(syncLoad.json?.history?.length, 1, 'History sync load should return one record.');
 
+        assert.equal(syncLoad.json.authTokenHash, undefined, 'Public responses must not expose credential hashes.');
+        assert.equal(syncLoad.response.headers.get('cache-control'), 'no-store', 'Health history must not be cached.');
+        const privacy = await fetchText(`${BASE_URL}/privacy.html`);
+        assert.equal(privacy.response.status, 200, 'Privacy notice should be public.');
+
+        for (const endpoint of ['/api/admin/backup', '/api/admin/backups', '/api/cron/backup']) {
+            const response = await fetch(`${BASE_URL}${endpoint}`, { method: endpoint === '/api/admin/backup' ? 'POST' : 'GET' });
+            assert.equal(response.status, 401, 'Backup and cron endpoints must require credentials.');
+        }
         const blockedExport = await fetchJson(`${BASE_URL}/api/admin/export`);
         assert.equal(
             blockedExport.response.status,
@@ -316,6 +365,14 @@ async function run() {
         });
         assert.equal(restoreResponse.response.status, 200, 'Admin restore endpoint should return 200.');
         assert.equal(restoreResponse.json?.ok, true, 'Admin restore should confirm success.');
+
+        const restoredLoad = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`, { headers: syncHeaders });
+        assert.equal(restoredLoad.response.status, 200, 'Original key must work after backup restore.');
+        assert.equal(restoredLoad.json.history.length, 1, 'Backup restore must preserve history.');
+        const deleted = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`, { method: 'DELETE', headers: syncHeaders });
+        assert.equal(deleted.response.status, 200, 'Owner should be able to delete cloud data.');
+        const deletedLoad = await fetchJson(`${BASE_URL}/api/history/sync/${profileId}`, { headers: syncHeaders });
+        assert.equal(deletedLoad.response.status, 401, 'Deleted profiles must be inaccessible.');
 
         const afterSummary = await fetchJson(`${BASE_URL}/api/analytics/summary`, {
             headers: createAnalyticsAuthHeaders()
@@ -366,6 +423,7 @@ async function run() {
                 resolve();
             });
         });
+        await fs.rm(testDirectory, { recursive: true, force: true });
     }
 }
 

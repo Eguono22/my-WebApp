@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Health Assessment Hub</title>
     <meta name="description" content="HealthAssessmentHub helps you review key wellness metrics, track progress over time, and get practical health guidance.">
-    <link rel="canonical" href="https://healthassessmenthub.com">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Health Assessment Hub">
     <meta property="og:title" content="Health Assessment Hub">
     <meta property="og:description" content="Review your wellness metrics, track progress over time, and get practical health guidance.">
-    <meta property="og:url" content="https://healthassessmenthub.com">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Health Assessment Hub">
     <meta name="twitter:description" content="Review your wellness metrics, track progress over time, and get practical health guidance.">
@@ -97,13 +95,13 @@
         <header>
             <div class="header-content hero-grid">
                 <div class="hero-copy">
-                    <p class="hero-eyebrow">AI-guided wellness review</p>
+                    <p class="hero-eyebrow">Guided wellness review</p>
                     <h1>Health Assessment Hub</h1>
                     <p class="subtitle">A structured wellness review that helps you interpret core health signals, understand your current profile, and decide on sensible next steps.</p>
                     <div class="hero-trust-row">
                         <div class="hero-trust-pill">
                             <i class="fas fa-wave-square"></i>
-                            Structured clinical-style scoring
+                            Rules-based wellness scoring
                         </div>
                         <div class="hero-trust-pill">
                             <i class="fas fa-user-shield"></i>
@@ -277,7 +275,7 @@
                             <i class="fas fa-chart-line"></i>
                             Generate Assessment
                         </button>
-                        <p class="form-submit-note">Your entries remain on this device unless you choose to sync them later with a Profile ID.</p>
+                        <p class="form-submit-note">Your entries are sent to this server to calculate your assessment. History stays on this device unless you choose cloud sync.</p>
                     </form>
                 </div>
 
@@ -544,9 +542,12 @@
                         <i class="fas fa-cloud-arrow-up"></i>
                         Sync Across Devices
                     </h3>
-                    <p class="sync-help">Use the same Profile ID on each device. Enabling sync stores your history and goal data on the server linked to that ID.</p>
+                    <p class="sync-help" id="syncKeyHelp">Create a private sync key, copy it somewhere safe, and use it on your other devices. Anyone with this key can access or delete your cloud history. Lost keys cannot be recovered. Old Profile IDs no longer grant access.</p>
                     <div class="sync-controls">
-                        <input type="text" id="syncProfileId" placeholder="e.g. myhealthprofile01" maxlength="40">
+                        <label for="syncProfileId" class="sync-key-label">Private sync key</label>
+                        <input type="password" id="syncProfileId" placeholder="Create or paste your private sync key" maxlength="97" autocomplete="off" spellcheck="false" aria-describedby="syncKeyHelp">
+                        <button id="syncCreateBtn" class="btn-share" type="button">Create private key</button>
+                        <button id="syncCopyBtn" class="btn-share" type="button">Copy key</button>
                         <button id="syncSaveBtn" class="btn-submit" type="button">
                             <i class="fas fa-cloud-upload-alt"></i>
                             Save To Cloud
@@ -555,7 +556,9 @@
                             <i class="fas fa-cloud-download-alt"></i>
                             Load From Cloud
                         </button>
+                        <button id="syncDeleteBtn" class="btn-reset" type="button">Delete cloud profile</button>
                     </div>
+                    <p id="syncActionStatus" role="status" aria-live="polite"></p>
                 </div>
 
                 <div class="history-list-card">
@@ -572,6 +575,14 @@
             </div>
         </div>
 
+        <section class="data-controls surface-card" aria-labelledby="dataControlsTitle">
+            <h2 id="dataControlsTitle">Your data</h2>
+            <p>Analytics is optional. Assessments and cloud sync work without it.</p>
+            <label><input id="analyticsConsent" type="checkbox"> Allow anonymous usage analytics, including assessment scores</label>
+            <p><button id="clearDeviceDataBtn" class="btn-reset" type="button">Delete all data on this device</button></p>
+            <p>To remove cloud history too, use Delete cloud profile before clearing this device.</p>
+        </section>
+
         <footer>
             <div class="footer-content">
                 <p>
@@ -580,10 +591,10 @@
                     Always consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
                 </p>
                 <p class="footer-info">
-                    <i class="fas fa-lock"></i> Assessment history remains on this device unless you choose to sync it with a Profile ID.
+                    <i class="fas fa-lock"></i> Assessment history stays on this device unless you choose cloud sync. Assessment and chat requests are processed on our server.
                 </p>
                 <p class="footer-info">
-                    <a href="/analytics.html" class="footer-link">Open local analytics dashboard</a>
+                    <a href="/privacy.html" class="footer-link">Privacy &amp; data controls</a> · <a href="/analytics.html" class="footer-link">Admin analytics</a>
                 </p>
             </div>
         </footer>

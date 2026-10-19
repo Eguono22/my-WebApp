@@ -3,7 +3,8 @@
 let currentAssessmentData = null;
 const HISTORY_STORAGE_KEY = 'healthAssessmentHistoryV1';
 const SCORE_GOAL_STORAGE_KEY = 'healthAssessmentScoreGoalV1';
-const SYNC_PROFILE_STORAGE_KEY = 'healthAssessmentSyncProfileV1';
+const SYNC_PROFILE_STORAGE_KEY = 'healthAssessmentSyncKeyV2';
+const ANALYTICS_CONSENT_KEY = 'healthAssessmentAnalyticsConsentV1';
 const ANALYTICS_SESSION_STORAGE_KEY = 'healthAssessmentAnalyticsSessionV1';
 const FORM_DRAFT_STORAGE_KEY = 'healthAssessmentFormDraftV1';
 let trendChart = null;
@@ -32,50 +33,6 @@ const exampleAssessmentProfile = {
     sleepHours: '7.5',
     stressLevel: '2'
 };
-const NIGERIA_DOCTOR_DIRECTORY = [
-    {
-        name: 'Dr. Adaeze Nwankwo',
-        specialty: 'General Practice',
-        location: 'Ikeja, Lagos',
-        facility: 'Ikeja Family Health Clinic',
-        phone: '+234-803-111-2045'
-    },
-    {
-        name: 'Dr. Ibrahim Yusuf',
-        specialty: 'Cardiology',
-        location: 'Wuse, Abuja',
-        facility: 'HeartCare Specialist Centre',
-        phone: '+234-809-442-7118'
-    },
-    {
-        name: 'Dr. Chiamaka Okorie',
-        specialty: 'Internal Medicine',
-        location: 'GRA, Port Harcourt',
-        facility: 'Rivers Wellness Hospital',
-        phone: '+234-816-330-5589'
-    },
-    {
-        name: 'Dr. Olumide Adebayo',
-        specialty: 'Endocrinology',
-        location: 'Ibadan, Oyo',
-        facility: 'Bodija Specialist Clinic',
-        phone: '+234-802-615-0091'
-    },
-    {
-        name: 'Dr. Zainab Bello',
-        specialty: 'Family Medicine',
-        location: 'Kaduna North, Kaduna',
-        facility: 'Arewa Family Medical Centre',
-        phone: '+234-807-524-6622'
-    },
-    {
-        name: 'Dr. Emeka Umeh',
-        specialty: 'Pulmonology',
-        location: 'Enugu North, Enugu',
-        facility: 'Coal City Chest and Wellness Clinic',
-        phone: '+234-814-902-3774'
-    }
-];
 let nigeriaDoctorsCache = null;
 let nigeriaDoctorsRequest = null;
 let nigeriaDoctorsFetchedAt = null;
@@ -89,7 +46,7 @@ async function getNigeriaDoctorDirectory(limit = 30, forceRefresh = false) {
         return {
             doctors: nigeriaDoctorsCache,
             fallback: false,
-            stale: false,
+            stale: true,
             cached: true,
             fetchedAt: nigeriaDoctorsFetchedAt
         };
@@ -119,7 +76,7 @@ async function getNigeriaDoctorDirectory(limit = 30, forceRefresh = false) {
             })
             .catch((error) => {
                 console.error('Unable to load doctor source:', error);
-                nigeriaDoctorsCache = NIGERIA_DOCTOR_DIRECTORY;
+                nigeriaDoctorsCache = nigeriaDoctorsCache || [];
                 return {
                     doctors: nigeriaDoctorsCache,
                     fallback: true,
@@ -149,7 +106,7 @@ function getDoctorDirectoryControls() {
 
 function formatDoctorDirectoryUpdatedText(fetchedAt, options = {}) {
     if (!fetchedAt) {
-        return options.fallback ? 'Last updated: backup list in use' : 'Last updated: unavailable';
+        return options.fallback ? 'Directory source unavailable' : 'Last updated: unavailable';
     }
 
     const date = new Date(fetchedAt);
@@ -228,6 +185,12 @@ function applyDoctorFilters() {
     });
 }
 
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
+
 function renderDoctorCards(doctors) {
     const { directoryList, directoryCount } = getDoctorDirectoryControls();
 
@@ -239,7 +202,7 @@ function renderDoctorCards(doctors) {
     directoryCount.textContent = `Showing ${doctors.length} of ${doctorDirectoryState.allDoctors.length} doctors`;
 
     if (!doctors.length) {
-        directoryList.innerHTML = '<p class="doctor-loading">No doctors match this filter. Try a different city or specialty.</p>';
+        directoryList.innerHTML = '<p class="doctor-loading">No listings available. Try another filter or refresh the directory.</p>';
         return;
     }
 
@@ -247,24 +210,25 @@ function renderDoctorCards(doctors) {
         const doctorCard = document.createElement('article');
         doctorCard.className = 'doctor-card';
 
-        const safePhone = String(doctor.phone || '').trim();
+        const safePhone = String(doctor.phone || '').replace(/[^+\d ()-]/g, '');
         const whatsappDigits = safePhone.replace(/[^\d]/g, '');
         const hasPhone = Boolean(whatsappDigits);
-        const profileUrl = String(doctor.profileUrl || '').trim();
+        const rawProfileUrl = String(doctor.profileUrl || '').trim();
+        const profileUrl = /^https?:\/\//i.test(rawProfileUrl) ? escapeHtml(rawProfileUrl) : '';
 
         doctorCard.innerHTML = `
-            <h4>${doctor.name}</h4>
+            <h4>${escapeHtml(doctor.name)}</h4>
             <p class="doctor-meta">
                 <i class="fas fa-stethoscope"></i>
-                ${doctor.specialty || 'General Practice'}
+                ${escapeHtml(doctor.specialty || 'General Practice')}
             </p>
             <p class="doctor-meta">
                 <i class="fas fa-hospital"></i>
-                ${doctor.facility || 'Clinic details on profile'}
+                ${escapeHtml(doctor.facility || 'Clinic details on profile')}
             </p>
             <p class="doctor-meta">
                 <i class="fas fa-location-dot"></i>
-                ${doctor.location || 'Nigeria'}
+                ${escapeHtml(doctor.location || 'Nigeria')}
             </p>
             ${hasPhone ? `
                 <a class="doctor-phone" href="tel:${safePhone}">
@@ -331,6 +295,7 @@ function getAnalyticsSessionId() {
 
 async function trackEvent(eventName, properties = {}) {
     try {
+        if (localStorage.getItem(ANALYTICS_CONSENT_KEY) !== 'yes' || navigator.doNotTrack === '1') return;
         await fetch('/api/analytics/event', {
             method: 'POST',
             headers: {
@@ -863,7 +828,8 @@ healthForm.addEventListener('submit', async (e) => {
         });
 
         if (!response.ok) {
-            throw new Error('Assessment failed');
+            const failure = await response.json().catch(() => ({}));
+            throw new Error(failure.error || 'Assessment failed');
         }
 
         const result = await response.json();
@@ -895,7 +861,7 @@ healthForm.addEventListener('submit', async (e) => {
         }, 100);
 
     } catch (error) {
-        showNotification('The assessment could not be completed. Please review your entries and try again.', 'error');
+        showNotification(error.message || 'The assessment could not be completed. Please try again.', 'error');
         console.error('Error:', error);
     } finally {
         // Reset button state
@@ -1074,7 +1040,7 @@ function renderDoctorDirectory(overallScore, forceRefresh = false) {
         });
 
         if (result.fallback) {
-            directoryNote.textContent += ' The primary source was temporarily unavailable, so a backup directory is shown.';
+            directoryNote.textContent += ' The source is temporarily unavailable. Use Refresh to try again; previously loaded listings appear when available.';
         } else if (result.stale) {
             directoryNote.textContent += ' Cached directory data is being shown while the source refreshes.';
         }
@@ -1566,13 +1532,11 @@ function renderHistorySection() {
         scoreGoalInput.value = String(scoreGoal);
     }
 
-    if (!history.length) {
-        historySection.style.display = 'none';
-        return;
-    }
+    // Cloud recovery must remain accessible on a new device with no local history.
+    historySection.style.display = 'block';
 
     historySection.style.display = 'block';
-    historyList.innerHTML = '';
+    historyList.innerHTML = history.length ? '' : '<p>No assessments yet. Complete an assessment or load your cloud history.</p>';
 
     const sortedHistory = [...history].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const recent = sortedHistory.slice(0, 8);
@@ -1582,12 +1546,12 @@ function renderHistorySection() {
         card.className = 'history-item';
         card.innerHTML = `
             <div class="history-item-main">
-                <strong>${entry.overallScore}/100</strong>
-                <span>${entry.status}</span>
+                <strong>${escapeHtml(entry.overallScore)}/100</strong>
+                <span>${escapeHtml(entry.status)}</span>
             </div>
             <div class="history-item-meta">
-                <span>BMI ${entry.bmi}</span>
-                <span>${entry.systolic}/${entry.diastolic} mmHg</span>
+                <span>BMI ${escapeHtml(entry.bmi)}</span>
+                <span>${escapeHtml(entry.systolic)}/${escapeHtml(entry.diastolic)} mmHg</span>
                 <span>${formatHistoryDate(entry.createdAt)}</span>
             </div>
         `;
@@ -1963,8 +1927,31 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-function sanitizeProfileId(rawId) {
-    return (rawId || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+function getSyncCredentials() {
+    const key = document.getElementById('syncProfileId')?.value.trim() || '';
+    if (!/^[a-f0-9]{32}\.[a-f0-9]{64}$/.test(key)) {
+        throw new Error('Create or paste a valid private sync key first.');
+    }
+    const [profileId, token] = key.split('.');
+    localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, key);
+    return { profileId, token };
+}
+
+async function runSyncAction(buttonId, action) {
+    const buttons = [...document.querySelectorAll('.sync-controls button')];
+    buttons.forEach((button) => { button.disabled = true; });
+    const status = document.getElementById('syncActionStatus');
+    if (status) status.textContent = 'Working…';
+    try {
+        const message = await action();
+        if (status) status.textContent = message;
+        showNotification(message, 'success');
+    } catch (error) {
+        if (status) status.textContent = error.message;
+        showNotification(error.message, 'error');
+    } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+    }
 }
 
 // Welcome message on page load
@@ -2013,6 +2000,7 @@ if (historyMetricSelect) {
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener('click', () => {
+        if (!window.confirm('Clear all assessment history on this device? This cannot be undone.')) return;
         localStorage.removeItem(HISTORY_STORAGE_KEY);
         if (trendChart) {
             trendChart.destroy();
@@ -2044,83 +2032,97 @@ if (saveGoalBtn) {
     });
 }
 
-const syncSaveBtn = document.getElementById('syncSaveBtn');
-if (syncSaveBtn) {
-    syncSaveBtn.addEventListener('click', async () => {
-        const syncProfileIdInput = document.getElementById('syncProfileId');
-        if (!syncProfileIdInput) return;
+document.getElementById('syncCreateBtn')?.addEventListener('click', () => {
+    if (document.getElementById('syncProfileId').value && !window.confirm('Create a different cloud profile? Save your current key first to keep access to existing cloud history.')) return;
+    runSyncAction('syncCreateBtn', async () => {
+        const response = await fetch('/api/history/profile', { method: 'POST' });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Unable to create profile.');
+        document.getElementById('syncProfileId').value = payload.syncKey;
+        localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, payload.syncKey);
+        return 'Private key created. Copy and save it, then use Save To Cloud to upload history.';
+    });
+});
 
-        const profileId = sanitizeProfileId(syncProfileIdInput.value);
-        if (!profileId) {
-            showNotification('Enter a valid Profile ID first.', 'error');
-            return;
-        }
-
-        syncProfileIdInput.value = profileId;
-        localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, profileId);
-
+document.getElementById('syncCopyBtn')?.addEventListener('click', () => {
+    runSyncAction('syncCopyBtn', async () => {
+        getSyncCredentials();
+        const input = document.getElementById('syncProfileId');
         try {
-            const response = await fetch('/api/history/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    profileId,
-                    history: getAssessmentHistory(),
-                    goalTarget: getSavedScoreGoal()
-                })
-            });
-
-            const payload = await response.json();
-            if (!response.ok) {
-                throw new Error(payload.error || 'Sync save failed');
-            }
-
-            trackEvent('history_sync_saved', {
-                historyCount: getAssessmentHistory().length
-            });
-            showNotification('Cloud sync saved successfully.', 'success');
-        } catch (error) {
-            console.error('Sync save failed:', error);
-            showNotification(`Cloud save failed: ${error.message}`, 'error');
+            await navigator.clipboard.writeText(input.value.trim());
+        } catch {
+            input.type = 'text';
+            input.focus();
+            input.select();
+            throw new Error('Copy the selected key manually, then keep it somewhere safe.');
         }
+        return 'Private sync key copied. Keep it somewhere safe.';
+    });
+});
+
+document.getElementById('syncSaveBtn')?.addEventListener('click', () => {
+    if (!window.confirm('Upload this device’s history and goal? This replaces the history in this cloud profile.')) return;
+    runSyncAction('syncSaveBtn', async () => {
+        const { profileId, token } = getSyncCredentials();
+        const response = await fetch('/api/history/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ profileId, history: getAssessmentHistory(), goalTarget: getSavedScoreGoal() })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Cloud save failed.');
+        trackEvent('history_sync_saved', { historyCount: getAssessmentHistory().length });
+        return 'Cloud history saved.';
+    });
+});
+
+document.getElementById('syncLoadBtn')?.addEventListener('click', () => {
+    if (getAssessmentHistory().length && !window.confirm('Replace this device’s assessment history with your cloud history?')) return;
+    runSyncAction('syncLoadBtn', async () => {
+        const { profileId, token } = getSyncCredentials();
+        const response = await fetch(`/api/history/sync/${profileId}`, { headers: { Authorization: `Bearer ${token}` } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Cloud load failed.');
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(payload.history));
+        saveScoreGoal(payload.goalTarget);
+        renderHistorySection();
+        trackEvent('history_sync_loaded', { historyCount: payload.history.length });
+        return 'Cloud history loaded.';
+    });
+});
+
+document.getElementById('syncDeleteBtn')?.addEventListener('click', () => {
+    if (!window.confirm('Permanently delete this cloud profile and its history? This cannot be undone. Local history remains on this device.')) return;
+    runSyncAction('syncDeleteBtn', async () => {
+        const { profileId, token } = getSyncCredentials();
+        const response = await fetch(`/api/history/sync/${profileId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Cloud deletion failed.');
+        localStorage.removeItem(SYNC_PROFILE_STORAGE_KEY);
+        document.getElementById('syncProfileId').value = '';
+        return 'Cloud profile deleted. Provider backups may retain a copy until they expire.';
+    });
+});
+
+const analyticsConsent = document.getElementById('analyticsConsent');
+if (analyticsConsent) {
+    analyticsConsent.checked = localStorage.getItem(ANALYTICS_CONSENT_KEY) === 'yes';
+    analyticsConsent.addEventListener('change', () => {
+        localStorage.setItem(ANALYTICS_CONSENT_KEY, analyticsConsent.checked ? 'yes' : 'no');
+        if (analyticsConsent.checked) trackEvent('page_view', { path: window.location.pathname });
     });
 }
 
-const syncLoadBtn = document.getElementById('syncLoadBtn');
-if (syncLoadBtn) {
-    syncLoadBtn.addEventListener('click', async () => {
-        const syncProfileIdInput = document.getElementById('syncProfileId');
-        if (!syncProfileIdInput) return;
+document.getElementById('clearDeviceDataBtn')?.addEventListener('click', () => {
+    if (!window.confirm('Delete history, drafts, goal, analytics preference, and saved sync key from this device? Keep a copy of your sync key if you need cloud access. Cloud history must be deleted separately.')) return;
+    [HISTORY_STORAGE_KEY, SCORE_GOAL_STORAGE_KEY, SYNC_PROFILE_STORAGE_KEY, FORM_DRAFT_STORAGE_KEY, ANALYTICS_CONSENT_KEY, 'healthAssessmentSyncProfileV1'].forEach((key) => localStorage.removeItem(key));
+    sessionStorage.removeItem(ANALYTICS_SESSION_STORAGE_KEY);
+    window.location.reload();
+});
 
-        const profileId = sanitizeProfileId(syncProfileIdInput.value);
-        if (!profileId) {
-            showNotification('Enter a valid Profile ID first.', 'error');
-            return;
-        }
-
-        syncProfileIdInput.value = profileId;
-        localStorage.setItem(SYNC_PROFILE_STORAGE_KEY, profileId);
-
-        try {
-            const response = await fetch(`/api/history/sync/${encodeURIComponent(profileId)}`);
-            const payload = await response.json();
-            if (!response.ok) {
-                throw new Error(payload.error || 'Sync load failed');
-            }
-
-            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(payload.history || []));
-            if (typeof payload.goalTarget === 'number') {
-                saveScoreGoal(Math.min(100, Math.max(1, Math.round(payload.goalTarget))));
-            }
-
-            renderHistorySection();
-            trackEvent('history_sync_loaded', {
-                historyCount: Array.isArray(payload.history) ? payload.history.length : 0
-            });
-            showNotification('Cloud data loaded successfully.', 'success');
-        } catch (error) {
-            console.error('Sync load failed:', error);
-            showNotification(`Cloud load failed: ${error.message}`, 'error');
-        }
-    });
-}
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && aiChatPanel.classList.contains('active')) {
+        closeChatPanel();
+        aiChatBtn.focus();
+    }
+});

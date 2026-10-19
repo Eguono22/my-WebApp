@@ -1,4 +1,9 @@
+// Load local configuration before storage and authentication are initialized.
+try { process.loadEnvFile('.env.local'); } catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
 const express = require('express');
+const { randomBytes, createHash, timingSafeEqual } = require('node:crypto');
 const path = require('path');
 const { createStorage } = require('./lib/storage');
 const app = express();
@@ -23,7 +28,7 @@ let doctorDirectoryCache = {
 };
 
 app.disable('x-powered-by');
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 function wait(ms) {
   return new Promise((resolve) => {
@@ -146,6 +151,7 @@ async function fetchDoctorsFromSource(limit, pages) {
     let response;
     try {
       response = await fetch(pageUrl, {
+        signal: AbortSignal.timeout(8000),
         headers: {
           'User-Agent': 'HealthAssessmentHubBot/1.0 (+https://healthassessmenthub.com)'
         }
@@ -193,6 +199,12 @@ function buildReadinessReport(storageLabel) {
   const databaseUrlConfigured = Boolean(String(process.env.DATABASE_URL || '').trim());
   const vercelDeployment = isVercelDeployment();
   const checks = [
+    {
+      name: 'scheduled_backup_authentication',
+      ok: String(process.env.CRON_SECRET || '').length >= 32,
+      required: vercelDeployment && process.env.VERCEL_ENV === 'production',
+      detail: 'Production daily cloud backups require a CRON_SECRET of at least 32 characters.'
+    },
     {
       name: 'storage_initialized',
       ok: Boolean(storageLabel),
@@ -300,14 +312,38 @@ function requireAnalyticsAuth(req, res, next) {
   return next();
 }
 
+// Best-effort per-instance abuse protection; cloud edge limits can supplement it.
+const requestWindows = new Map();
+app.use('/api', (req, res, next) => {
+  const now = Date.now();
+  if (requestWindows.size > 10000) {
+    for (const [key, window] of requestWindows) if (window.expiresAt <= now) requestWindows.delete(key);
+    if (requestWindows.size > 10000) return res.status(429).json({ error: 'Server is busy. Please try again shortly.' });
+  }
+  const registration = req.path === '/history/profile';
+  const key = `${req.ip}:${registration ? 'profile' : 'api'}`;
+  let window = requestWindows.get(key);
+  if (!window || window.expiresAt <= now) {
+    window = { count: 0, expiresAt: now + 60000 };
+    requestWindows.set(key, window);
+  }
+  window.count += 1;
+  if (window.count > (registration ? 10 : 180)) {
+    res.setHeader('Retry-After', String(Math.ceil((window.expiresAt - now) / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please try again in a minute.' });
+  }
+  next();
+});
 app.use(express.json({ limit: '5mb' }));
 app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  if (req.path.startsWith('/api/') || req.path.startsWith('/analytics')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
 app.use(
-  ['/analytics', '/analytics.html', '/api/analytics/summary', '/api/admin/export', '/api/admin/restore'],
+  ['/analytics', '/analytics.html', '/api/analytics/summary', '/api/admin/export', '/api/admin/restore', '/api/admin/backup', '/api/admin/backups'],
   requireAnalyticsAuth
 );
 
@@ -324,7 +360,7 @@ app.get('/favicon.ico', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'favicon.svg'));
 });
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -1232,6 +1268,9 @@ app.get('/api/doctors/nigeria', async (req, res) => {
 app.post('/api/assess', (req, res) => {
   try {
     const healthData = req.body;
+    if (!isPlainObject(healthData)) {
+      return res.status(400).json({ error: 'Assessment data must be an object' });
+    }
     
     // Validate required fields and types
     const validationRules = {
@@ -1271,6 +1310,10 @@ app.post('/api/assess', (req, res) => {
       }
     }
 
+    if (healthData.systolic <= healthData.diastolic) {
+      return res.status(400).json({ error: 'Systolic pressure must be greater than diastolic pressure' });
+    }
+
     const assessment = healthAI.assessHealth(healthData);
     res.json(assessment);
   } catch (error) {
@@ -1281,7 +1324,56 @@ app.post('/api/assess', (req, res) => {
   }
 });
 
-app.post('/api/history/sync', async (req, res) => {
+function hashSyncToken(token) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+async function requireSyncAuth(req, res, next) {
+  const profileId = String(req.params.profileId || req.body?.profileId || '');
+  const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
+  if (!/^[a-f0-9]{32}$/.test(profileId) || !/^[a-f0-9]{64}$/.test(token)) {
+    return res.status(401).json({ error: 'A valid private sync key is required.' });
+  }
+  try {
+    const profile = await getSyncedProfile(profileId);
+    const expected = profile?.authTokenHash || '';
+    if (!/^[a-f0-9]{64}$/.test(expected) ||
+        !timingSafeEqual(Buffer.from(hashSyncToken(token), 'hex'), Buffer.from(expected, 'hex'))) {
+      return res.status(401).json({ error: 'Invalid private sync key.' });
+    }
+    req.syncedProfile = profile;
+    next();
+  } catch (error) {
+    console.error('Sync authentication failed:', error);
+    res.status(503).json({ error: 'Cloud storage is temporarily unavailable.' });
+  }
+}
+
+app.post('/api/history/profile', async (req, res) => {
+  try {
+    const profileId = randomBytes(16).toString('hex');
+    const token = randomBytes(32).toString('hex');
+    const storage = await getStorage();
+    await storage.createSyncedProfile(profileId, hashSyncToken(token));
+    res.status(201).json({ profileId, syncKey: `${profileId}.${token}` });
+  } catch (error) {
+    console.error('Profile creation failed:', error);
+    res.status(503).json({ error: 'Unable to create a private cloud profile.' });
+  }
+});
+
+app.delete('/api/history/sync/:profileId', requireSyncAuth, async (req, res) => {
+  try {
+    const storage = await getStorage();
+    await storage.deleteSyncedProfile(req.params.profileId);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Profile deletion failed:', error);
+    res.status(503).json({ error: 'Unable to delete cloud data. Please try again.' });
+  }
+});
+
+app.post('/api/history/sync', requireSyncAuth, async (req, res) => {
   try {
     const { profileId: rawProfileId, history, goalTarget } = req.body || {};
     const profileId = sanitizeProfileId(rawProfileId);
@@ -1302,6 +1394,13 @@ app.post('/api/history/sync', async (req, res) => {
       return res.status(400).json({ error: 'Each history entry must be an object' });
     }
 
+    const numericFields = ['overallScore', 'bmi', 'age', 'systolic', 'diastolic', 'heartRate', 'exerciseHours', 'sleepHours', 'stressLevel'];
+    if (!history.every((entry) => typeof entry.createdAt === 'string' && Number.isFinite(Date.parse(entry.createdAt)) &&
+        typeof entry.overallScore === 'number' && entry.overallScore >= 0 && entry.overallScore <= 100 &&
+        numericFields.every((field) => entry[field] === undefined || (typeof entry[field] === 'number' && Number.isFinite(entry[field])))) ||
+        (goalTarget !== undefined && (typeof goalTarget !== 'number' || !Number.isFinite(goalTarget) || goalTarget < 1 || goalTarget > 100))) {
+      return res.status(400).json({ error: 'History must contain valid dates and finite numeric metrics; goal must be between 1 and 100.' });
+    }
     const normalizedHistory = history.map(normalizeHistoryEntry);
     const updatedAt = await saveSyncedProfile(profileId, normalizedHistory, goalTarget);
     return res.json({
@@ -1315,7 +1414,7 @@ app.post('/api/history/sync', async (req, res) => {
   }
 });
 
-app.get('/api/history/sync/:profileId', async (req, res) => {
+app.get('/api/history/sync/:profileId', requireSyncAuth, async (req, res) => {
   try {
     const profileId = sanitizeProfileId(req.params.profileId);
 
@@ -1323,7 +1422,7 @@ app.get('/api/history/sync/:profileId', async (req, res) => {
       return res.status(400).json({ error: 'Valid profileId is required' });
     }
 
-    const data = await getSyncedProfile(profileId);
+    const data = req.syncedProfile;
 
     if (!data) {
       return res.status(404).json({ error: 'No synced data found for this profileId' });
@@ -1379,6 +1478,51 @@ app.get('/api/analytics/summary', async (req, res) => {
   }
 });
 
+async function createCloudBackup(req, res) {
+  try {
+    const storage = await getStorage();
+    if (storage.label !== 'postgres') return res.status(503).json({ error: 'Cloud backups require PostgreSQL.' });
+    const result = await storage.createBackup();
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error('Cloud backup failed:', error);
+    res.status(503).json({ error: 'Unable to create cloud backup.' });
+  }
+}
+
+app.post('/api/admin/backup', createCloudBackup);
+app.get('/api/admin/backups', async (req, res) => {
+  try {
+    const storage = await getStorage();
+    res.json({ backups: storage.listBackups ? await storage.listBackups() : [] });
+  } catch (error) {
+    console.error('Backup listing failed:', error);
+    res.status(503).json({ error: 'Unable to list cloud backups.' });
+  }
+});
+app.get('/api/admin/backups/:backupId', async (req, res) => {
+  try {
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(req.params.backupId)) return res.status(400).json({ error: 'Invalid backup ID.' });
+    const storage = await getStorage();
+    const payload = storage.getBackup ? await storage.getBackup(req.params.backupId) : null;
+    if (!payload) return res.status(404).json({ error: 'Backup not found.' });
+    res.attachment(`${req.params.backupId}.json`).json(payload);
+  } catch (error) {
+    console.error('Backup retrieval failed:', error);
+    res.status(503).json({ error: 'Unable to retrieve cloud backup.' });
+  }
+});
+app.get('/api/cron/backup', (req, res, next) => {
+  const secret = process.env.CRON_SECRET || '';
+  const supplied = String(req.headers.authorization || '');
+  const expected = `Bearer ${secret}`;
+  if (secret.length < 32 || Buffer.byteLength(supplied) !== Buffer.byteLength(expected) ||
+      !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}, createCloudBackup);
+
 app.get('/api/admin/export', async (req, res) => {
   try {
     const exportPayload = await exportAdminData();
@@ -1401,7 +1545,13 @@ app.post('/api/admin/restore', async (req, res) => {
   try {
     const payload = req.body;
 
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    if (!isPlainObject(payload) || !Array.isArray(payload.syncedProfiles) ||
+        !Array.isArray(payload.analyticsEvents) ||
+        !payload.syncedProfiles.every((profile) => isPlainObject(profile) &&
+          typeof profile.profileId === 'string' && profile.profileId.length > 0 &&
+          Array.isArray(profile.history) && profile.history.every(isPlainObject)) ||
+        !payload.analyticsEvents.every((event) => isPlainObject(event) &&
+          typeof event.sessionId === 'string' && typeof event.eventName === 'string')) {
       return res.status(400).json({ error: 'A valid export payload is required.' });
     }
 
@@ -1418,7 +1568,7 @@ app.post('/api/admin/restore', async (req, res) => {
 });
 
 // Only listen when running locally (not on Vercel)
-if (process.env.NODE_ENV !== 'production') {
+if (require.main === module && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Health Assessment Server running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} to access the application`);

@@ -18,6 +18,8 @@
                 <p class="analytics-subtitle">Track visits, assessment completions, chat engagement, and sync usage.</p>
             </div>
             <div class="analytics-header-actions">
+                <button id="analyticsBackupBtn" class="analytics-export-link" type="button">Create cloud backup</button>
+                <button id="analyticsRefreshBtn" class="analytics-export-link" type="button">Refresh data</button>
                 <a class="analytics-export-link" href="/api/admin/export">
                     <i class="fas fa-download"></i>
                     Export JSON
@@ -34,7 +36,10 @@
             </div>
         </header>
 
+        <p id="analyticsBackupStatus" class="analytics-restore-status" role="status" aria-live="polite"></p>
         <p id="analyticsRestoreStatus" class="analytics-restore-status" aria-live="polite"></p>
+
+        <p id="analyticsLoadStatus" role="status" aria-live="polite"></p>
 
         <section class="analytics-grid">
             <article class="analytics-card">
@@ -96,8 +101,9 @@
                     <p id="generatedAtText">Loading summary...</p>
                 </div>
                 <div class="chart-frame analytics-chart-frame">
-                    <canvas id="analyticsTrendChart" height="110"></canvas>
+                    <canvas id="analyticsTrendChart" height="110" role="img" aria-label="Page views, completed assessments, and chat opens over the last seven days"></canvas>
                 </div>
+                <div id="analyticsTrendTable"></div>
             </article>
 
             <article class="analytics-panel">

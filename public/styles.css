@@ -2534,3 +2534,27 @@ footer {
         border-radius: 20px;
     }
 }
+
+/* Keep analytics readable when charts are unavailable and on small screens. */
+.analytics-export-link { font: inherit; cursor: pointer; }
+.analytics-export-link:disabled { opacity: .6; cursor: wait; }
+#analyticsLoadStatus { margin: 0 0 1.5rem; color: #475569; }
+#analyticsTrendTable { overflow-x: auto; margin-top: 1rem; }
+.analytics-trend-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.analytics-trend-table caption { text-align: left; padding: .5rem; color: #64748b; }
+.analytics-trend-table th, .analytics-trend-table td { text-align: left; padding: .6rem; border-bottom: 1px solid #e2e8f0; }
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+.data-controls { padding: 1.5rem; margin: 1.5rem 0; }
+.data-controls p { margin: .75rem 0; }
+.sync-key-label { display: block; width: 100%; font-weight: 700; }
+.sync-controls { flex-wrap: wrap; }
+.sync-controls input { min-width: 0; max-width: 100%; }
+#syncActionStatus { margin-top: .75rem; overflow-wrap: anywhere; }
+.privacy-content { max-width: 800px; margin: 2rem auto; padding: 2rem; }
+.privacy-content h1, .privacy-content h2 { margin: 1.5rem 0 .75rem; }
+.privacy-content p, .privacy-content li { margin-bottom: .75rem; line-height: 1.7; }
+@media (max-width: 600px) { .sync-controls > input, .sync-controls > button { width: 100%; } .privacy-content { margin: 1rem; padding: 1.25rem; } }

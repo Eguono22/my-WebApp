@@ -1,0 +1,8 @@
+node_modules
+.git
+data
+.env*
+backups
+test-results
+playwright-report
+tmp-*.png
