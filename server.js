@@ -153,7 +153,7 @@ async function fetchDoctorsFromSource(limit, pages) {
       response = await fetch(pageUrl, {
         signal: AbortSignal.timeout(8000),
         headers: {
-          'User-Agent': 'HealthAssessmentHubBot/1.0 (+https://healthassessmenthub.com)'
+          'User-Agent': 'HealthAssessmentHubBot/1.0'
         }
       });
     } catch (error) {
